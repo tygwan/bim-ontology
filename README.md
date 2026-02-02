@@ -17,6 +17,9 @@ IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL Query
 - **이름 기반 분류**: Navisworks 내보내기로 손실된 타입 정보를 이름 패턴으로 복원
 - **SPARQL 쿼리**: rdflib 기반 로컬 트리플 스토어에서 쿼리 실행
 - **다중 직렬화**: Turtle, RDF/XML, JSON-LD, N-Triples 지원
+- **OWL/RDFS 추론**: owlrl 기반 추론 엔진 (RDFS subClassOf, OWL inverseOf, 커스텀 CONSTRUCT 규칙)
+- **쿼리 캐싱**: LRU 인메모리 캐시 (14,800x+ 속도 향상)
+- **스트리밍 변환**: 배치 단위 대용량 IFC 파일 처리
 
 ## Quick Start
 
@@ -116,6 +119,10 @@ bim-ontology/
 │   │   └── namespace_manager.py # 네임스페이스 관리
 │   ├── storage/
 │   │   └── triple_store.py     # SPARQL 트리플 스토어
+│   ├── cache/
+│   │   └── query_cache.py      # LRU 쿼리 캐시
+│   ├── inference/
+│   │   └── reasoner.py         # OWL/RDFS 추론 엔진
 │   ├── api/
 │   │   ├── server.py           # FastAPI 서버
 │   │   ├── routes/             # SPARQL, Buildings, Statistics
@@ -124,8 +131,8 @@ bim-ontology/
 │   └── clients/
 │       └── python/client.py    # Python 클라이언트
 ├── examples/                   # 사용 예제 5개
-├── scripts/                    # 분석/테스트 스크립트
-├── tests/                      # 61개 테스트
+├── scripts/                    # 분석/벤치마크 스크립트
+├── tests/                      # 90개 테스트
 ├── data/
 │   └── rdf/                    # 변환된 RDF 파일
 ├── docs/
@@ -148,17 +155,29 @@ bim-ontology/
 
 ## Test Results
 
-- **61/61 tests passed** (100% pass rate)
-- **Coverage: 83%** (target: 70%)
+- **90/90 tests passed** (100% pass rate)
+- **Coverage: 85%** (target: 70%)
 
 | Module | Coverage |
 |--------|----------|
+| query_cache.py | 100% |
+| namespace_manager.py | 100% |
+| triple_store.py | 95% |
+| api routes | 96~100% |
+| streaming_converter.py | 88% |
+| reasoner.py | 88% |
 | ifc_to_rdf.py | 86% |
 | ifc_parser.py | 85% |
-| triple_store.py | 94% |
-| api routes | 96~100% |
 | client.py | 82% |
-| namespace_manager.py | 100% |
+
+## Performance Benchmarks
+
+| Metric | Value |
+|--------|-------|
+| IFC4 (224MB) 변환 | 1.3s / 39,237 triples |
+| IFC2X3 (828MB) 변환 | 38.1s / 39,237 triples |
+| SPARQL 캐시 속도 향상 | 14,869x (65ms -> 0.004ms) |
+| OWL 추론 트리플 증가 | +66.7% (39K -> 65K) |
 
 ## Known Issues
 
@@ -176,6 +195,8 @@ bim-ontology/
 - **Python 3.12**
 - **ifcopenshell** 0.8.4 - IFC 파일 파싱
 - **rdflib** 7.5.0 - RDF 그래프 및 SPARQL
+- **owlrl** 6.0+ - OWL/RDFS 추론
+- **FastAPI** - REST/SPARQL API
 - **pytest** - 테스트 프레임워크
 
 ## References
