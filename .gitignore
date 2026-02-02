@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large IFC files and reference papers
+references/*.ifc
+references/*.pdf
+
+# Generated RDF output
+data/rdf/*.ttl
+data/rdf/*.xml
+data/rdf/*.jsonld
+
+# Environment
+.env
+.env.local
+
+# Test cache
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Claude Code
+.claude/analytics/metrics.jsonl
+.claude/plans/
+.claude/logs/
+.claude/session.log
+.claude/changes.log
+
+# Node (if any)
+node_modules/
