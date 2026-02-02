@@ -20,6 +20,8 @@ IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL Query
 - **OWL/RDFS 추론**: owlrl 기반 추론 엔진 (RDFS subClassOf, OWL inverseOf, 커스텀 CONSTRUCT 규칙)
 - **쿼리 캐싱**: LRU 인메모리 캐시 (14,800x+ 속도 향상)
 - **스트리밍 변환**: 배치 단위 대용량 IFC 파일 처리
+- **웹 대시보드**: 건물 계층, 요소 탐색, SPARQL 에디터, 추론 실행 UI
+- **Docker 지원**: 단일 컨테이너 배포
 
 ## Quick Start
 
@@ -78,17 +80,29 @@ store.save("output.ttl", fmt="turtle")
 # 서버 시작 (IFC 파일 자동 변환/캐싱)
 uvicorn src.api.server:app --reload
 
+# 대시보드: http://localhost:8000/
 # API 문서: http://localhost:8000/docs
 ```
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/` | 웹 대시보드 |
 | POST | `/api/sparql` | SPARQL 쿼리 실행 |
 | GET | `/api/buildings` | 건물 목록 |
 | GET | `/api/storeys` | 층 목록 |
 | GET | `/api/elements?category=Pipe` | 요소 목록 (카테고리 필터) |
 | GET | `/api/statistics` | 전체 통계 |
 | GET | `/api/hierarchy` | 건물 계층 구조 |
+| POST | `/api/reasoning` | OWL/RDFS 추론 실행 |
+
+### Docker
+
+```bash
+# Docker로 실행
+docker compose up --build
+
+# http://localhost:8000 으로 접속
+```
 
 ## Python Client
 
@@ -125,14 +139,17 @@ bim-ontology/
 │   │   └── reasoner.py         # OWL/RDFS 추론 엔진
 │   ├── api/
 │   │   ├── server.py           # FastAPI 서버
-│   │   ├── routes/             # SPARQL, Buildings, Statistics
+│   │   ├── routes/             # SPARQL, Buildings, Statistics, Reasoning
 │   │   ├── models/             # Pydantic 모델
 │   │   └── queries/            # SPARQL 쿼리 템플릿
+│   ├── dashboard/
+│   │   ├── index.html          # 웹 대시보드
+│   │   └── app.js              # 대시보드 로직
 │   └── clients/
 │       └── python/client.py    # Python 클라이언트
 ├── examples/                   # 사용 예제 5개
 ├── scripts/                    # 분석/벤치마크 스크립트
-├── tests/                      # 90개 테스트
+├── tests/                      # 91개 테스트
 ├── data/
 │   └── rdf/                    # 변환된 RDF 파일
 ├── docs/
@@ -142,6 +159,8 @@ bim-ontology/
 │   ├── DEVLOG.md               # 개발 일지 및 피드백
 │   └── phases/                 # Phase별 상세 문서
 ├── references/                 # IFC 샘플 파일 및 논문
+├── Dockerfile                 # Docker 컨테이너 설정
+├── docker-compose.yml         # Docker Compose 서비스 구성
 ├── requirements.txt
 └── README.md
 ```
@@ -155,7 +174,7 @@ bim-ontology/
 
 ## Test Results
 
-- **90/90 tests passed** (100% pass rate)
+- **91/91 tests passed** (100% pass rate)
 - **Coverage: 85%** (target: 70%)
 
 | Module | Coverage |

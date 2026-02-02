@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIM Ontology Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .card-header { border-bottom: 1px solid #334155; padding: 16px 20px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+        .card-body { padding: 20px; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: #f8fafc; }
+        .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; }
+        .nav-tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: #94a3b8; }
+        .nav-tab:hover { color: #e2e8f0; }
+        .nav-tab.active { border-bottom-color: #3b82f6; color: #3b82f6; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-secondary:hover { background: #475569; }
+        textarea, input, select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 8px 12px; }
+        textarea:focus, input:focus { outline: none; border-color: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 12px; font-size: 12px; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #334155; }
+        td { padding: 10px 12px; border-bottom: 1px solid #1e293b; font-size: 13px; }
+        tr:hover td { background: #1e293b; }
+        .tree-item { padding: 6px 0; cursor: pointer; }
+        .tree-children { padding-left: 20px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-blue { background: #1e3a5f; color: #60a5fa; }
+        .badge-green { background: #14532d; color: #4ade80; }
+        .badge-amber { background: #451a03; color: #fbbf24; }
+        .badge-purple { background: #3b0764; color: #c084fc; }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: #64748b; }
+        .spinner { width: 20px; height: 20px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #sparql-editor { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 13px; min-height: 160px; resize: vertical; }
+        .hierarchy-node { margin-left: 0; }
+        .hierarchy-node .children { margin-left: 24px; border-left: 1px solid #334155; padding-left: 12px; }
+        .node-icon { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="border-b border-gray-700 px-6 py-3 flex items-center justify-between" style="background: #1e293b;">
+            <div class="flex items-center gap-3">
+                <div class="text-lg font-bold text-blue-400">BIM Ontology</div>
+                <span class="text-xs text-gray-500">Dashboard v1.0</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="health-indicator" class="text-xs text-gray-500">Connecting...</span>
+                <span id="triple-count" class="text-xs badge badge-blue">-- triples</span>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="flex border-b border-gray-700 px-6" style="background: #1e293b;">
+            <div class="nav-tab active" data-tab="overview">Overview</div>
+            <div class="nav-tab" data-tab="buildings">Buildings</div>
+            <div class="nav-tab" data-tab="elements">Elements</div>
+            <div class="nav-tab" data-tab="sparql">SPARQL</div>
+            <div class="nav-tab" data-tab="reasoning">Reasoning</div>
+        </nav>
+
+        <!-- Content -->
+        <main class="p-6" id="main-content">
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-content">
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="stat-triples">--</div>
+                            <div class="stat-label">Total Triples</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="stat-elements">--</div>
+                            <div class="stat-label">Physical Elements</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="stat-categories">--</div>
+                            <div class="stat-label">Categories</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="stat-buildings">--</div>
+                            <div class="stat-label">Buildings</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="card">
+                        <div class="card-header">Category Distribution</div>
+                        <div class="card-body">
+                            <canvas id="chart-categories" height="300"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Top Categories</div>
+                        <div class="card-body">
+                            <canvas id="chart-bar" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buildings Tab -->
+            <div id="tab-buildings" class="tab-content" style="display:none">
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="card col-span-1">
+                        <div class="card-header">Building Hierarchy</div>
+                        <div class="card-body" id="hierarchy-tree">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card col-span-2">
+                        <div class="card-header">Storeys & Elements</div>
+                        <div class="card-body" id="storey-detail">
+                            <p class="text-gray-500 text-sm">Select a building from the hierarchy to view details.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Elements Tab -->
+            <div id="tab-elements" class="tab-content" style="display:none">
+                <div class="card">
+                    <div class="card-header flex items-center justify-between">
+                        <span>Elements</span>
+                        <div class="flex gap-2">
+                            <select id="filter-category" class="text-sm">
+                                <option value="">All Categories</option>
+                            </select>
+                            <input type="text" id="filter-search" placeholder="Search by name..." class="text-sm" style="width:200px">
+                            <button class="btn btn-primary text-sm" onclick="loadElements()">Search</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Original Type</th>
+                                    <th>Global ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="elements-table">
+                                <tr><td colspan="4" class="text-center text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="flex items-center justify-between mt-4">
+                            <span class="text-xs text-gray-500" id="elements-info">--</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary text-sm" id="btn-prev" onclick="prevPage()">Prev</button>
+                                <button class="btn btn-secondary text-sm" id="btn-next" onclick="nextPage()">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SPARQL Tab -->
+            <div id="tab-sparql" class="tab-content" style="display:none">
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="card col-span-2">
+                        <div class="card-header flex items-center justify-between">
+                            <span>SPARQL Query</span>
+                            <button class="btn btn-primary text-sm" onclick="executeSparql()">Execute</button>
+                        </div>
+                        <div class="card-body">
+                            <textarea id="sparql-editor" class="w-full">PREFIX bim: <http://example.org/bim-ontology/schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?cat (COUNT(?e) AS ?num)
+WHERE {
+    ?e rdf:type bim:PhysicalElement .
+    ?e bim:hasCategory ?cat .
+}
+GROUP BY ?cat
+ORDER BY DESC(?num)</textarea>
+                        </div>
+                        <div class="card-header">Results</div>
+                        <div class="card-body" style="max-height: 400px; overflow: auto;">
+                            <table>
+                                <thead id="sparql-thead"><tr><th>--</th></tr></thead>
+                                <tbody id="sparql-tbody">
+                                    <tr><td class="text-gray-500">Run a query to see results.</td></tr>
+                                </tbody>
+                            </table>
+                            <div class="text-xs text-gray-500 mt-2" id="sparql-info"></div>
+                        </div>
+                    </div>
+                    <div class="card col-span-1">
+                        <div class="card-header">Query Templates</div>
+                        <div class="card-body space-y-2" id="query-templates">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reasoning Tab -->
+            <div id="tab-reasoning" class="tab-content" style="display:none">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>OWL/RDFS Reasoning</span>
+                            <button class="btn btn-primary text-sm" onclick="runReasoning()" id="btn-reasoning">Run Reasoning</button>
+                        </div>
+                        <div class="card-body" id="reasoning-status">
+                            <p class="text-gray-500 text-sm">Click "Run Reasoning" to apply OWL/RDFS inference rules and custom SPARQL CONSTRUCT rules to the loaded graph.</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Reasoning Results</div>
+                        <div class="card-body" id="reasoning-results">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <div class="stat-label">Before</div>
+                                    <div class="text-2xl font-bold" id="reason-before">--</div>
+                                </div>
+                                <div>
+                                    <div class="stat-label">After</div>
+                                    <div class="text-2xl font-bold text-green-400" id="reason-after">--</div>
+                                </div>
+                                <div>
+                                    <div class="stat-label">Inferred</div>
+                                    <div class="text-2xl font-bold text-blue-400" id="reason-inferred">--</div>
+                                </div>
+                                <div>
+                                    <div class="stat-label">Time</div>
+                                    <div class="text-2xl font-bold" id="reason-time">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Inferred Types Query</div>
+                    <div class="card-body" id="reasoning-types">
+                        <p class="text-gray-500 text-sm">Run reasoning first, then inferred type counts will appear here.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

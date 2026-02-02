@@ -43,8 +43,8 @@ class TestHealth:
     def test_root(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        data = r.json()
-        assert data["service"] == "BIM Ontology API"
+        assert "text/html" in r.headers["content-type"]
+        assert "BIM Ontology" in r.text
 
     def test_health(self, client):
         r = client.get("/health")
@@ -199,3 +199,15 @@ class TestQueryTemplates:
         r = client.post("/api/sparql", json={"query": get_overall_statistics()})
         assert r.status_code == 200
         assert r.json()["count"] > 0
+
+
+# ---------- Reasoning ----------
+
+class TestReasoning:
+    def test_run_reasoning(self, client):
+        r = client.post("/api/reasoning")
+        assert r.status_code == 200
+        data = r.json()
+        assert "total_inferred" in data
+        assert data["total_inferred"] > 0
+        assert "rules_applied" in data

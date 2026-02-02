@@ -152,25 +152,22 @@ BIM Ontology 프로젝트 개발 과정 기록.
 
 ## 향후 과제
 
-### 단기 (Phase 2)
+### 완료된 과제
 
-- [ ] ifcOWL 공식 온톨로지 파일 통합
-- [ ] "Other" 카테고리 세분화 (추가 패턴 분석)
-- [ ] IFC2X3 파일 전체 변환 테스트
-- [ ] SPARQL 쿼리 라이브러리 구축
+- [x] IFC 파싱 및 RDF 변환 (Phase 1)
+- [x] SPARQL 쿼리 API (Phase 2)
+- [x] Python 클라이언트 (Phase 3)
+- [x] 성능 최적화 및 추론 (Phase 4)
+- [x] 웹 대시보드 및 Docker (Phase 5)
 
-### 중기 (Phase 3-4)
+### 향후 확장
 
 - [ ] GraphDB/Apache Jena 외부 트리플 스토어 연동
-- [ ] 온톨로지 추론(reasoning) 적용
-- [ ] REST API 구현 (FastAPI)
-- [ ] 대용량 파일 스트리밍 처리
-
-### 장기 (Phase 5+)
-
-- [ ] 웹 UI 대시보드
+- [ ] ifcOWL 공식 온톨로지 파일 통합
+- [ ] "Other" 카테고리 세분화 (ML 기반 분류)
 - [ ] 다중 온톨로지 융합 (EurOTL, SSN 등)
 - [ ] 규정 자동 검증 (Code Compliance Checking)
+- [ ] 3D 뷰어 통합 (IFC.js / Three.js)
 
 ---
 
@@ -288,7 +285,7 @@ BIM Ontology 프로젝트 개발 과정 기록.
 | clients | 1 | BIMOntologyClient |
 | **전체** | **13** | - |
 
-### 발견된 문제점 총 11건
+### 발견된 문제점 총 12건
 
 | ID | 요약 | 상태 |
 |----|------|------|
@@ -420,3 +417,74 @@ BIM Ontology 프로젝트 개발 과정 기록.
 ### Codex CLI 교차 리뷰 결과
 
 Phase 4에서 Codex CLI(`codex exec review`)를 활용한 교차 리뷰를 처음 도입. Claude + Codex 듀얼 리뷰 패턴으로 F-010, F-011 문제를 발견함. `codex-reviewer` 에이전트를 `.claude/agents/`에 추가하여 향후 자동 교차 검증 워크플로우 구축.
+
+---
+
+## Phase 5: 웹 대시보드 및 배포 (2026-02-03)
+
+### 목표
+
+- 웹 기반 대시보드로 BIM 온톨로지 데이터 시각적 탐색
+- Docker 컨테이너화 및 배포 설정
+- API 추론 엔드포인트 추가
+
+### 수행 내용
+
+1. `src/dashboard/index.html` - 웹 대시보드 SPA
+   - 다크 테마 (Tailwind CSS CDN)
+   - 5개 탭: Overview, Buildings, Elements, SPARQL, Reasoning
+2. `src/dashboard/app.js` - 대시보드 로직
+   - Chart.js 통합 (도넛 차트, 수평 바 차트)
+   - 건물 계층 트리 렌더러
+   - 요소 테이블 (카테고리 필터, 검색, 페이지네이션)
+   - SPARQL 쿼리 에디터 (6개 템플릿)
+   - 추론 실행 UI (before/after 통계)
+3. `src/api/routes/reasoning.py` - 추론 API 엔드포인트
+   - `POST /api/reasoning` → OWLReasoner.run_all() 실행
+4. `src/api/server.py` 업데이트
+   - StaticFiles 마운트 (`/static` → dashboard/)
+   - `/` 라우트를 대시보드 HTML 서빙으로 변경
+5. `Dockerfile` - Python 3.12-slim 기반 컨테이너
+6. `docker-compose.yml` - 단일 서비스 구성
+
+### 대시보드 탭 상세
+
+| 탭 | 기능 | 데이터 소스 |
+|----|------|-------------|
+| Overview | 통계 카드 + 카테고리 분포 차트 | `/api/statistics`, `/api/statistics/categories` |
+| Buildings | 건물-층 계층 트리 + 층 상세 | `/api/hierarchy`, `/api/buildings/{id}` |
+| Elements | 필터/검색/페이지네이션 테이블 | `/api/elements` |
+| SPARQL | 쿼리 에디터 + 결과 테이블 | `/api/sparql` |
+| Reasoning | 추론 실행 + 추론 결과 | `/api/reasoning`, `/api/sparql` |
+
+### API 엔드포인트 추가
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/reasoning` | OWL/RDFS 추론 실행 |
+| GET | `/` | 웹 대시보드 (HTML) |
+| GET | `/static/*` | 대시보드 정적 파일 |
+
+### 아키텍처 결정
+
+#### AD-008: SPA vs 서버 사이드 렌더링
+
+- **결정**: 단일 HTML + vanilla JS로 클라이언트 사이드 SPA 구현
+- **이유**: React/Vue 등 프레임워크 빌드 과정 불필요. CDN 기반 Tailwind CSS + Chart.js로 충분. FastAPI의 StaticFiles로 간단히 서빙.
+- **한계**: 대규모 데이터셋에서 클라이언트 렌더링 성능 저하 가능. 향후 가상 스크롤링 또는 서버 사이드 페이지네이션 강화 필요.
+
+#### AD-009: Docker 단일 서비스 구성
+
+- **결정**: API + 대시보드를 단일 Docker 컨테이너로 구성
+- **이유**: 현 단계에서는 단일 프로세스(uvicorn)로 API와 정적 파일 모두 서빙 가능. 외부 DB 없이 인메모리 TripleStore 사용.
+- **향후**: GraphDB/Fuseki 연동 시 multi-container 구성(docker-compose)으로 확장.
+
+### 테스트 결과
+
+| Phase | 테스트 수 | 통과 | 비고 |
+|-------|-----------|------|------|
+| Phase 0-1 | 28 | 28 | IFC 파싱, RDF 변환 |
+| Phase 2 | 21 | 21 | API 테스트 (+1 reasoning) |
+| Phase 3 | 13 | 13 | 클라이언트 |
+| Phase 4 | 29 | 29 | 캐시, 추론, 스트리밍 |
+| **전체** | **91** | **91** | **85%+ 커버리지** |

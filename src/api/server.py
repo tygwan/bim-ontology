@@ -1,6 +1,7 @@
 """FastAPI 서버 애플리케이션.
 
 IFC → RDF 온톨로지 데이터에 대한 SPARQL 및 REST API를 제공합니다.
+웹 대시보드를 포함합니다.
 """
 
 import logging
@@ -9,8 +10,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .routes import sparql, buildings, statistics
+from .routes import reasoning
 from .utils.query_executor import init_store
 from ..parser import IFCParser
 from ..converter import RDFConverter
@@ -99,10 +103,7 @@ def create_app(store: TripleStore | None = None) -> FastAPI:
     app.include_router(sparql.router, prefix="/api", tags=["SPARQL"])
     app.include_router(buildings.router, prefix="/api", tags=["Buildings"])
     app.include_router(statistics.router, prefix="/api", tags=["Statistics"])
-
-    @app.get("/", tags=["Health"])
-    async def root():
-        return {"service": "BIM Ontology API", "version": "1.0.0"}
+    app.include_router(reasoning.router, prefix="/api", tags=["Reasoning"])
 
     @app.get("/health", tags=["Health"])
     async def health():
@@ -112,6 +113,19 @@ def create_app(store: TripleStore | None = None) -> FastAPI:
             return {"status": "healthy", "triples": len(s)}
         except RuntimeError:
             return {"status": "unhealthy", "triples": 0}
+
+    # 대시보드 정적 파일 서빙
+    dashboard_dir = Path(__file__).parent.parent / "dashboard"
+    if dashboard_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(dashboard_dir)), name="static")
+
+        @app.get("/", tags=["Dashboard"])
+        async def dashboard():
+            return FileResponse(str(dashboard_dir / "index.html"))
+    else:
+        @app.get("/", tags=["Health"])
+        async def root():
+            return {"service": "BIM Ontology API", "version": "2.0.0"}
 
     return app
 
