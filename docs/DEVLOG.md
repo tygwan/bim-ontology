@@ -171,3 +171,132 @@ BIM Ontology 프로젝트 개발 과정 기록.
 - [ ] 웹 UI 대시보드
 - [ ] 다중 온톨로지 융합 (EurOTL, SSN 등)
 - [ ] 규정 자동 검증 (Code Compliance Checking)
+
+---
+
+## Phase 2: SPARQL 쿼리 엔드포인트 (2026-02-03)
+
+### 목표
+
+- FastAPI 기반 REST/SPARQL API 서버 구현
+- SPARQL 쿼리 템플릿 10개 작성
+- OpenAPI 문서 자동 생성
+
+### 수행 내용
+
+1. `src/api/server.py` - FastAPI 서버 (CORS, lifespan, RDF 자동 로딩/캐싱)
+2. `src/api/routes/sparql.py` - SPARQL POST 엔드포인트
+3. `src/api/routes/buildings.py` - Buildings/Storeys/Elements REST API
+4. `src/api/routes/statistics.py` - 통계/카테고리/계층 구조 API
+5. `src/api/models/` - Pydantic 요청/응답 모델
+6. `src/api/queries/templates.py` - SPARQL 쿼리 템플릿 10개
+7. `tests/test_api.py` - 20개 API 테스트
+
+### 발견된 문제점
+
+#### F-007: RDF 캐싱 전략
+
+- **상태**: 구현됨
+- **내용**: 224MB IFC 파일을 매 서버 시작마다 변환하면 13초+ 소요
+- **대응**: `data/rdf/` 디렉토리에 Turtle 파일로 캐싱. 이미 변환된 RDF 파일이 있으면 직접 로딩(~2초). `server.py`의 `load_data()` 함수에서 자동 판별.
+
+#### F-008: TripleStore 전역 상태 관리
+
+- **상태**: 구현됨
+- **내용**: FastAPI는 비동기 프레임워크이므로 TripleStore 인스턴스를 안전하게 공유해야 함
+- **대응**: `query_executor.py`에서 전역 `_store` 변수로 관리. `create_app(store=)` 으로 테스트 시 직접 주입 가능. 프로덕션에서는 `lifespan` 이벤트에서 초기화.
+
+### 테스트 결과
+
+- **20/20 API 테스트 통과**
+- SPARQL 엔드포인트, Buildings API, Statistics API 모두 정상
+- 잘못된 SPARQL 쿼리 시 500 에러, 빈 쿼리 시 422 검증 에러 정상 처리
+
+### API 엔드포인트
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | 서비스 정보 |
+| GET | `/health` | 헬스 체크 |
+| POST | `/api/sparql` | SPARQL 쿼리 실행 |
+| GET | `/api/buildings` | 건물 목록 |
+| GET | `/api/buildings/{id}` | 건물 상세 |
+| GET | `/api/storeys` | 층 목록 |
+| GET | `/api/elements` | 요소 목록 (카테고리 필터, 페이지네이션) |
+| GET | `/api/statistics` | 전체 통계 |
+| GET | `/api/statistics/categories` | 카테고리별 통계 |
+| GET | `/api/hierarchy` | 건물 계층 구조 |
+
+---
+
+## Phase 3: Python 클라이언트 라이브러리 (2026-02-03)
+
+### 목표
+
+- BIMOntologyClient 클래스 구현 (로컬/원격 모드)
+- 헬퍼 메서드 (건물, 층, 요소, 통계 등)
+- 사용 예제 5개
+
+### 수행 내용
+
+1. `src/clients/python/client.py` - BIMOntologyClient 클래스
+   - `from_ifc()` - IFC 파일에서 직접 생성
+   - `from_rdf()` - RDF 파일에서 생성
+   - `from_api()` - 원격 API 서버 연결
+2. `tests/test_client.py` - 13개 클라이언트 테스트
+3. `examples/01~05_*.py` - 5개 사용 예제
+
+### 아키텍처 결정
+
+#### AD-004: 듀얼 모드 클라이언트
+
+- **결정**: 동일한 API로 로컬(TripleStore 직접) 및 원격(HTTP API) 모드 지원
+- **이유**: 개발/테스트 시에는 로컬 모드로 빠르게 반복하고, 배포 시에는 원격 API 서버 사용
+- **구현**: `is_local` 속성으로 모드 판별. `query()` 메서드가 내부적으로 분기.
+
+#### AD-005: Java 클라이언트 보류
+
+- **결정**: Phase 3 스펙의 Java/JavaScript 클라이언트는 현 단계에서 보류
+- **이유**: 프로젝트의 핵심 파이프라인(IFC→RDF→SPARQL)이 모두 Python으로 동작. REST API가 있으므로 다른 언어는 HTTP 호출로 충분.
+
+### 테스트 결과
+
+- **13/13 클라이언트 테스트 통과**
+- 로컬 모드: IFC 로딩 → 변환 → 쿼리 전체 파이프라인 동작 확인
+
+---
+
+## 전체 Phase 0~3 요약 (2026-02-03)
+
+### 테스트 현황
+
+| Phase | 테스트 수 | 통과 | 커버리지 |
+|-------|-----------|------|----------|
+| Phase 0-1 | 28 | 28 | 83% |
+| Phase 2 | 20 | 20 | - |
+| Phase 3 | 13 | 13 | - |
+| **전체** | **61** | **61** | **83%** |
+
+### 모듈 현황
+
+| 모듈 | 파일 수 | 주요 클래스 |
+|------|---------|-------------|
+| parser | 1 | IFCParser |
+| converter | 3 | RDFConverter, NamespaceManager, Mapping |
+| storage | 1 | TripleStore |
+| api | 7 | FastAPI server, routes, models |
+| clients | 1 | BIMOntologyClient |
+| **전체** | **13** | - |
+
+### 발견된 문제점 총 8건
+
+| ID | 요약 | 상태 |
+|----|------|------|
+| F-001 | IFC 스키마 버전 불일치 (IFC4 vs IFC2X3) | 대응 완료 |
+| F-002 | Navisworks 타입 손실 | 이름 기반 분류 |
+| F-003 | 빈 속성셋 | 확인됨 |
+| F-004 | GlobalId 없는 엔티티 | 수정됨 |
+| F-005 | 대용량 기하 형상 | 제외 처리 |
+| F-006 | SPARQL 변수명 충돌 | 수정됨 |
+| F-007 | RDF 캐싱 전략 | 구현됨 |
+| F-008 | TripleStore 전역 상태 | 구현됨 |

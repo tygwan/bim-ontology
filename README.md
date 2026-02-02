@@ -69,6 +69,40 @@ for row in results:
 store.save("output.ttl", fmt="turtle")
 ```
 
+## API Server
+
+```bash
+# 서버 시작 (IFC 파일 자동 변환/캐싱)
+uvicorn src.api.server:app --reload
+
+# API 문서: http://localhost:8000/docs
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/sparql` | SPARQL 쿼리 실행 |
+| GET | `/api/buildings` | 건물 목록 |
+| GET | `/api/storeys` | 층 목록 |
+| GET | `/api/elements?category=Pipe` | 요소 목록 (카테고리 필터) |
+| GET | `/api/statistics` | 전체 통계 |
+| GET | `/api/hierarchy` | 건물 계층 구조 |
+
+## Python Client
+
+```python
+from src.clients.python import BIMOntologyClient
+
+# 로컬 모드 (IFC 파일 직접 사용)
+client = BIMOntologyClient.from_ifc("references/sample.ifc")
+
+# 원격 모드 (API 서버 연결)
+client = BIMOntologyClient.from_api("http://localhost:8000")
+
+stats = client.get_statistics()
+pipes = client.get_elements(category="Pipe", limit=10)
+hierarchy = client.get_hierarchy()
+```
+
 ## Project Structure
 
 ```
@@ -80,11 +114,18 @@ bim-ontology/
 │   │   ├── ifc_to_rdf.py       # RDF 변환 메인
 │   │   ├── mapping.py          # IFC → ifcOWL 매핑 룰
 │   │   └── namespace_manager.py # 네임스페이스 관리
-│   └── storage/
-│       └── triple_store.py     # SPARQL 트리플 스토어
+│   ├── storage/
+│   │   └── triple_store.py     # SPARQL 트리플 스토어
+│   ├── api/
+│   │   ├── server.py           # FastAPI 서버
+│   │   ├── routes/             # SPARQL, Buildings, Statistics
+│   │   ├── models/             # Pydantic 모델
+│   │   └── queries/            # SPARQL 쿼리 템플릿
+│   └── clients/
+│       └── python/client.py    # Python 클라이언트
+├── examples/                   # 사용 예제 5개
 ├── scripts/                    # 분석/테스트 스크립트
-├── tests/
-│   └── test_integration.py     # 통합 테스트 (28개)
+├── tests/                      # 61개 테스트
 ├── data/
 │   └── rdf/                    # 변환된 RDF 파일
 ├── docs/
@@ -107,14 +148,16 @@ bim-ontology/
 
 ## Test Results
 
-- **28/28 tests passed** (100% pass rate)
+- **61/61 tests passed** (100% pass rate)
 - **Coverage: 83%** (target: 70%)
 
 | Module | Coverage |
 |--------|----------|
 | ifc_to_rdf.py | 86% |
 | ifc_parser.py | 85% |
-| triple_store.py | 92% |
+| triple_store.py | 94% |
+| api routes | 96~100% |
+| client.py | 82% |
 | namespace_manager.py | 100% |
 
 ## Known Issues
