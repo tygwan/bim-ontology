@@ -60,7 +60,7 @@ const base = import.meta.env.BASE_URL;
   │
   ├─ RDFConverter                      ifcOWL 기반 RDF 트리플 생성
   │    ├─ Name-based Classification    29개 카테고리 분류
-  │    └─ Streaming Mode               828MB+ 대용량 처리
+  │    └─ Streaming Mode               대용량 IFC 파일 처리
   │
   ├─ TripleStore (rdflib)              로컬 SPARQL 엔진
   │    ├─ Query Cache (LRU)            14,869x 속도 향상
@@ -90,7 +90,7 @@ const base = import.meta.env.BASE_URL;
           <div class="card-body">
             <div style="margin-bottom:12px;"><span class="badge badge-blue">Core</span></div>
             <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">IFC Parsing & RDF Conversion</h3>
-            <p style="font-size:0.85rem;color:var(--text-muted);">ifcopenshell 기반 IFC4/IFC2X3 파싱. ifcOWL 네임스페이스 기반 RDF 트리플 생성. 배치 단위 스트리밍으로 828MB+ 파일 처리.</p>
+            <p style="font-size:0.85rem;color:var(--text-muted);">ifcopenshell 기반 IFC4/IFC2X3 파싱. ifcOWL 네임스페이스 기반 RDF 트리플 생성. 배치 단위 스트리밍으로 대용량 파일 처리.</p>
           </div>
         </div>
         <div class="card">
@@ -422,14 +422,14 @@ docker compose --profile graphdb up --build
             </thead>
             <tbody>
               <tr>
-                <td>IFC4 (224MB) conversion</td>
+                <td>IFC4 conversion</td>
                 <td style="font-weight:700;color:var(--green);">1.3s</td>
                 <td style="color:var(--text-muted);">39,237 triples</td>
               </tr>
               <tr>
-                <td>IFC2X3 (828MB) conversion</td>
+                <td>IFC2X3 conversion (streaming)</td>
                 <td style="font-weight:700;color:var(--green);">38.1s</td>
-                <td style="color:var(--text-muted);">Streaming mode</td>
+                <td style="color:var(--text-muted);">39,237 triples</td>
               </tr>
               <tr>
                 <td>SPARQL cache speedup</td>

@@ -21,7 +21,7 @@ IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL / REST 
 - **RDF Conversion** - ifcOWL 네임스페이스 기반 RDF 트리플 생성
 - **Name-based Classification** - Navisworks 내보내기로 손실된 타입을 29개 카테고리로 복원
 - **SPARQL Queries** - rdflib 기반 로컬 트리플 스토어
-- **Streaming Conversion** - 배치 단위 대용량 IFC 파일 처리 (828MB+)
+- **Streaming Conversion** - 배치 단위 대용량 IFC 파일 처리
 
 ### Smart3D Plant Support
 - **10 Plant-specific Patterns** - MemberSystem, Hanger, PipeFitting, Flange, Nozzle 등
@@ -52,7 +52,7 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 2. 서버 시작 (data/rdf/nwd4op-12.ttl에서 자동 로딩)
+# 2. 서버 시작
 uvicorn src.api.server:app --reload
 
 # 3. 브라우저에서 대시보드 열기
@@ -197,7 +197,7 @@ bim-ontology/
 │   │   └── app.js                    # Dashboard logic
 │   └── clients/python/client.py      # Python client
 ├── data/
-│   ├── rdf/nwd4op-12.ttl             # Pre-converted RDF cache
+│   ├── rdf/                           # Converted RDF cache (.gitignore)
 │   └── ontology/                     # SHACL shapes, rules, custom schema
 ├── tests/                            # 91 tests (requires_ifc marker)
 ├── docker-compose.yml                # API + GraphDB (optional)
@@ -244,19 +244,12 @@ bim-ontology/
 | `infer_storey_has_elements` | Storey with elements -> hasElements=true |
 | `infer_element_in_building` | Element in storey -> isInBuilding (transitive) |
 
-## Test Data
-
-| File | Schema | Size | Entities | Physical Elements |
-|------|--------|------|----------|-------------------|
-| nwd4op-12.ifc | IFC4 | 224MB | 66,538 | 3,911 (Equipment Systems) |
-| nwd23op-12.ifc | IFC2X3 | 828MB | 16,945,319 | 3,980 (Structure Systems) |
-
 ## Performance
 
 | Metric | Value |
 |--------|-------|
-| IFC4 (224MB) conversion | 1.3s / 39,237 triples |
-| IFC2X3 (828MB) conversion | 38.1s / 39,237 triples |
+| IFC4 conversion | 1.3s / 39,237 triples |
+| IFC2X3 conversion (streaming) | 38.1s / 39,237 triples |
 | SPARQL cache speedup | 14,869x (65ms -> 0.004ms) |
 | OWL reasoning triple increase | +66.7% (39K -> 65K) |
 | Test coverage | 85% (91 tests) |
