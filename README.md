@@ -2,6 +2,8 @@
 
 > IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고, SPARQL 쿼리 + 동적 스키마 편집 + SHACL 검증을 제공하는 시맨틱 BIM 파이프라인
 
+**[Documentation Site](https://tygwan.github.io/bim-ontology/)** | **[Dashboard Guide](https://tygwan.github.io/bim-ontology/guide/)** | **[API Reference](https://tygwan.github.io/bim-ontology/api/)**
+
 IFC 파일(Navisworks/Smart Plant 3D 내보내기 포함)을 ifcOWL 기반 RDF 트리플로 변환하여 시맨틱 웹 기술로 건설 데이터를 탐색, 추론, 검증합니다.
 
 ```
@@ -201,6 +203,22 @@ bim-ontology/
 ├── docker-compose.yml                # API + GraphDB (optional)
 └── requirements.txt                  # Python dependencies
 ```
+
+## Dashboard Guide
+
+7탭 대시보드(`http://localhost:8000`)로 BIM 데이터를 시각적으로 탐색하고 관리합니다.
+
+| Tab | Features |
+|-----|----------|
+| **Overview** | 4개 통계 카드 (Triples, Elements, Categories, Buildings), 카테고리 도넛 차트, Top 10 바 차트 |
+| **Buildings** | 건물 계층 트리 (Project → Site → Building → Storey), 노드 클릭 시 상세 정보 |
+| **Elements** | 카테고리 필터 드롭다운, 이름 검색, 50개 단위 페이지네이션 |
+| **SPARQL** | 쿼리 에디터 + Execute 버튼, 6개 프리셋 템플릿, 결과 테이블 (행 수, 실행 시간) |
+| **Properties** | GlobalId로 PropertySet 조회, 속성 키 검색, Smart3D Plant(SP3D) 데이터 요약 |
+| **Ontology** | Object Type/Link Type CRUD, 분류 규칙 JSON 에디터, 스키마 Import/Export/Apply |
+| **Reasoning** | OWL/RDFS 추론 실행, Before/After 트리플 비교, 추론된 타입별 요소 수, SHACL 검증 |
+
+상세 가이드: [tygwan.github.io/bim-ontology/guide](https://tygwan.github.io/bim-ontology/guide/)
 
 ## Classification System
 

@@ -1,0 +1,135 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'IFC to RDF/OWL semantic BIM pipeline' } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <title>{title}</title>
+  <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+  <style is:global>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --border: #334155;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --purple: #c084fc;
+      --red: #f87171;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 80px 0; }
+    .section-title {
+      font-size: 1.75rem; font-weight: 700; margin-bottom: 12px;
+    }
+    .section-subtitle {
+      color: var(--text-muted); font-size: 1rem; margin-bottom: 40px;
+    }
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 12px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;
+    }
+    .badge-blue { background: #1e3a5f; color: #60a5fa; }
+    .badge-green { background: #14532d; color: #4ade80; }
+    .badge-amber { background: #451a03; color: #fbbf24; }
+    .badge-purple { background: #3b0764; color: #c084fc; }
+    .badge-red { background: #450a0a; color: #f87171; }
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .card-header {
+      border-bottom: 1px solid var(--border); padding: 14px 20px;
+      font-weight: 600; font-size: 0.8rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted);
+    }
+    .card-body { padding: 20px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    code {
+      background: #0f172a; border: 1px solid var(--border);
+      padding: 2px 6px; border-radius: 4px; font-size: 0.85em;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    pre {
+      background: #0f172a; border: 1px solid var(--border);
+      padding: 16px; border-radius: 8px; overflow-x: auto;
+      font-size: 0.85rem; line-height: 1.5;
+    }
+    pre code { border: none; padding: 0; background: none; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; padding: 10px 14px; font-size: 0.7rem;
+      color: var(--text-dim); text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #1e293b; font-size: 0.85rem; }
+    .screenshot-placeholder {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px dashed var(--border); border-radius: 12px;
+      min-height: 360px; display: flex; align-items: center;
+      justify-content: center; color: var(--text-dim); font-size: 0.85rem;
+    }
+    .screenshot-placeholder img {
+      width: 100%; height: auto; border-radius: 10px;
+    }
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .hide-mobile { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header style="position:sticky;top:0;z-index:50;background:var(--bg-card);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);">
+    <div class="container" style="display:flex;align-items:center;justify-content:space-between;height:56px;">
+      <a href={base} style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <span style="font-size:1.1rem;font-weight:700;color:var(--accent);">BIM Ontology</span>
+        <span class="badge badge-blue">v2.0</span>
+      </a>
+      <nav style="display:flex;gap:24px;font-size:0.85rem;" class="hide-mobile">
+        <a href={base} style="color:var(--text-muted);">Home</a>
+        <a href={`${base}guide/`} style="color:var(--text-muted);">Dashboard Guide</a>
+        <a href={`${base}api/`} style="color:var(--text-muted);">API Reference</a>
+        <a href="https://github.com/tygwan/bim-ontology" style="color:var(--text-muted);">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <slot />
+
+  <!-- Footer -->
+  <footer style="border-top:1px solid var(--border);padding:32px 0;text-align:center;">
+    <div class="container">
+      <p style="color:var(--text-dim);font-size:0.8rem;">
+        Built with <a href="https://astro.build">Astro</a> &middot;
+        <a href="https://github.com/tygwan/bim-ontology">GitHub</a> &middot;
+        BIM Ontology &copy; 2026
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

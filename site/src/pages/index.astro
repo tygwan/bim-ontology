@@ -1,0 +1,496 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<Layout title="BIM Ontology - Semantic BIM Pipeline">
+  <!-- Hero -->
+  <section style="padding:80px 0 60px;text-align:center;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);">
+    <div class="container">
+      <div style="margin-bottom:16px;">
+        <span class="badge badge-blue" style="font-size:0.75rem;padding:4px 14px;">v2.0 — Phase 14 Complete</span>
+      </div>
+      <h1 style="font-size:2.8rem;font-weight:800;line-height:1.2;margin-bottom:16px;">
+        BIM <span style="color:var(--accent);">Ontology</span>
+      </h1>
+      <p style="color:var(--text-muted);font-size:1.1rem;max-width:640px;margin:0 auto 32px;">
+        IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고,<br/>
+        SPARQL 쿼리 + 동적 스키마 편집 + SHACL 검증을 제공하는 시맨틱 BIM 파이프라인
+      </p>
+      <div style="display:flex;gap:12px;justify-content:center;margin-bottom:48px;">
+        <a href={`${base}guide/`} style="display:inline-block;padding:10px 24px;background:var(--accent);color:white;border-radius:8px;font-weight:600;font-size:0.9rem;text-decoration:none;">Dashboard Guide</a>
+        <a href={`${base}api/`} style="display:inline-block;padding:10px 24px;background:var(--bg-card);border:1px solid var(--border);color:var(--text);border-radius:8px;font-weight:600;font-size:0.9rem;text-decoration:none;">API Reference</a>
+        <a href="https://github.com/tygwan/bim-ontology" style="display:inline-block;padding:10px 24px;background:var(--bg-card);border:1px solid var(--border);color:var(--text);border-radius:8px;font-weight:600;font-size:0.9rem;text-decoration:none;">GitHub</a>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid-4" style="max-width:800px;margin:0 auto;">
+        <div class="card" style="text-align:center;padding:20px;">
+          <div style="font-size:2rem;font-weight:800;color:var(--accent);">39K+</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;">RDF Triples</div>
+        </div>
+        <div class="card" style="text-align:center;padding:20px;">
+          <div style="font-size:2rem;font-weight:800;color:var(--green);">29</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;">Categories</div>
+        </div>
+        <div class="card" style="text-align:center;padding:20px;">
+          <div style="font-size:2rem;font-weight:800;color:var(--amber);">14,869x</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;">Cache Speedup</div>
+        </div>
+        <div class="card" style="text-align:center;padding:20px;">
+          <div style="font-size:2rem;font-weight:800;color:var(--purple);">91</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;">Tests (85% cov)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pipeline -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Pipeline Architecture</h2>
+      <p class="section-subtitle">IFC 파일에서 시맨틱 웹 기반 BIM 데이터까지의 전체 흐름</p>
+      <div class="card">
+        <div class="card-header">Data Flow</div>
+        <div class="card-body">
+          <pre><code>IFC File (.ifc)
+  │
+  ├─ IFCParser (ifcopenshell)          IFC4 / IFC2X3 파싱
+  │    └─ Smart3D Plant Detection      SP3D PropertySet 감지
+  │
+  ├─ RDFConverter                      ifcOWL 기반 RDF 트리플 생성
+  │    ├─ Name-based Classification    29개 카테고리 분류
+  │    └─ Streaming Mode               828MB+ 대용량 처리
+  │
+  ├─ TripleStore (rdflib)              로컬 SPARQL 엔진
+  │    ├─ Query Cache (LRU)            14,869x 속도 향상
+  │    └─ GraphDB Adapter              외부 트리플스토어
+  │
+  ├─ OWL Reasoner (owlrl)             7개 추론 규칙
+  │    └─ Custom SPARQL CONSTRUCT      StructuralElement, MEPElement, ...
+  │
+  ├─ SHACL Validator (pyshacl)         형상 제약조건 검증
+  │
+  └─ REST API (FastAPI)                20+ 엔드포인트
+       ├─ Web Dashboard                7탭 대시보드
+       ├─ SPARQL Endpoint              임의 쿼리 실행
+       └─ Ontology Editor              동적 스키마 편집</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" style="background:var(--bg-card);">
+    <div class="container">
+      <h2 class="section-title">Features</h2>
+      <p class="section-subtitle">Phase 0~14를 통해 구현된 핵심 기능들</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-blue">Core</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">IFC Parsing & RDF Conversion</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">ifcopenshell 기반 IFC4/IFC2X3 파싱. ifcOWL 네임스페이스 기반 RDF 트리플 생성. 배치 단위 스트리밍으로 828MB+ 파일 처리.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-green">Classification</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">29-Category Classification</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">Smart3D Plant 10개 패턴 포함 29개 카테고리. Navisworks 내보내기로 손실된 타입을 이름 기반으로 복원. "Other" 44% → ~10% 감소.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-purple">Inference</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">OWL Reasoning & SHACL</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">owlrl 기반 RDFS/OWL 추론 + 7개 커스텀 SPARQL CONSTRUCT 규칙. pyshacl 기반 5개 Shape 검증. +66.7% 트리플 증가.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-amber">Ontology</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">Dynamic Schema Editor</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">Palantir Foundry 영감의 온톨로지 편집기. Object Type, Property Type, Link Type CRUD. 런타임 분류 규칙 변경.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-blue">API</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">REST API + SPARQL</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">FastAPI 기반 20+ 엔드포인트. SPARQL 쿼리 실행, 건물/요소/속성 조회, 추론, 검증, 온톨로지 편집.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div style="margin-bottom:12px;"><span class="badge badge-green">Infra</span></div>
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;">Docker & GraphDB</h3>
+            <p style="font-size:0.85rem;color:var(--text-muted);">Docker Compose로 원클릭 배포. GraphDB 10.6 외부 트리플스토어 어댑터. GitHub Actions CI/CD.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard Preview -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">7-Tab Dashboard</h2>
+      <p class="section-subtitle">웹 브라우저에서 BIM 데이터를 탐색하고 관리하는 대시보드</p>
+      <div class="grid-2">
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="padding:16px;">
+              <table>
+                <tbody>
+                  <tr>
+                    <td><span class="badge badge-blue">1</span></td>
+                    <td style="font-weight:600;">Overview</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">통계 카드, 카테고리 도넛 차트, 바 차트</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-green">2</span></td>
+                    <td style="font-weight:600;">Buildings</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">건물 계층 트리, 층별 상세 정보</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-amber">3</span></td>
+                    <td style="font-weight:600;">Elements</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">요소 테이블, 카테고리 필터, 페이지네이션</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-purple">4</span></td>
+                    <td style="font-weight:600;">SPARQL</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">쿼리 에디터, 6개 템플릿, 실시간 결과</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-blue">5</span></td>
+                    <td style="font-weight:600;">Properties</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">속성 조회, 검색, Smart3D Plant 데이터</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-green">6</span></td>
+                    <td style="font-weight:600;">Ontology</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">타입/링크 CRUD, 분류 규칙, 스키마 관리</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-red">7</span></td>
+                    <td style="font-weight:600;">Reasoning</td>
+                    <td style="color:var(--text-muted);font-size:0.8rem;">OWL 추론 실행, SHACL 검증, 결과 통계</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <a href={`${base}guide/`} style="display:inline-block;padding:10px 20px;background:var(--accent);color:white;border-radius:8px;font-weight:600;font-size:0.85rem;text-decoration:none;">View Full Dashboard Guide &rarr;</a>
+        </div>
+        <div>
+          <div class="screenshot-placeholder">
+            <img src={`${base}screenshots/dashboard-overview.png`} alt="Dashboard Overview" onerror="this.parentElement.innerHTML='<span>Dashboard Overview Screenshot<br/><small style=color:#475569>(Add: screenshots/dashboard-overview.png)</small></span>'" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Classification -->
+  <section class="section" style="background:var(--bg-card);">
+    <div class="container">
+      <h2 class="section-title">Classification System</h2>
+      <p class="section-subtitle">29개 BIM 요소 카테고리 (순서 기반, 구체적 패턴 우선)</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">Smart3D Plant (10)</div>
+          <div class="card-body">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <span class="badge badge-green">MemberSystem</span>
+              <span class="badge badge-green">Hanger</span>
+              <span class="badge badge-green">PipeFitting</span>
+              <span class="badge badge-green">Flange</span>
+              <span class="badge badge-green">ProcessUnit</span>
+              <span class="badge badge-green">Conduit</span>
+              <span class="badge badge-green">Assembly</span>
+              <span class="badge badge-green">Brace</span>
+              <span class="badge badge-green">GroutPad</span>
+              <span class="badge badge-green">Nozzle</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Structural (6) + MEP (7)</div>
+          <div class="card-body">
+            <div style="margin-bottom:10px;">
+              <span style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">Structural</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                <span class="badge badge-blue">Slab</span>
+                <span class="badge badge-blue">Wall</span>
+                <span class="badge badge-blue">Column</span>
+                <span class="badge badge-blue">Beam</span>
+                <span class="badge badge-blue">Foundation</span>
+                <span class="badge badge-blue">Structural</span>
+              </div>
+            </div>
+            <div style="margin-bottom:10px;">
+              <span style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">MEP</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                <span class="badge badge-amber">Pipe</span>
+                <span class="badge badge-amber">Duct</span>
+                <span class="badge badge-amber">CableTray</span>
+                <span class="badge badge-amber">Insulation</span>
+                <span class="badge badge-amber">Valve</span>
+                <span class="badge badge-amber">Pump</span>
+                <span class="badge badge-amber">Equipment</span>
+              </div>
+            </div>
+            <div>
+              <span style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">Access + Other</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                <span class="badge badge-purple">Railing</span>
+                <span class="badge badge-purple">Stair</span>
+                <span class="badge badge-purple">Support</span>
+                <span class="badge badge-purple">MemberPart</span>
+                <span class="badge badge-purple">Aspect</span>
+                <span class="badge badge-purple">Geometry</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reasoning Rules -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Reasoning Rules</h2>
+      <p class="section-subtitle">OWL/RDFS 추론 + 7개 커스텀 SPARQL CONSTRUCT 규칙</p>
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>Input Categories</th>
+                <th>Inferred Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>infer_structural_element</code></td>
+                <td>Beam, Column, Slab, Wall, Foundation</td>
+                <td><span class="badge badge-blue">StructuralElement</span></td>
+              </tr>
+              <tr>
+                <td><code>infer_mep_element</code></td>
+                <td>Pipe, Duct, CableTray, Valve, Pump, Insulation, Equipment</td>
+                <td><span class="badge badge-amber">MEPElement</span></td>
+              </tr>
+              <tr>
+                <td><code>infer_access_element</code></td>
+                <td>Stair, Railing</td>
+                <td><span class="badge badge-purple">AccessElement</span></td>
+              </tr>
+              <tr>
+                <td><code>infer_plant_support_element</code></td>
+                <td>Hanger, Brace, MemberSystem, Support</td>
+                <td><span class="badge badge-green">PlantSupportElement</span></td>
+              </tr>
+              <tr>
+                <td><code>infer_piping_element</code></td>
+                <td>PipeFitting, Flange, Nozzle, Valve, Pipe</td>
+                <td><span class="badge badge-green">PipingElement</span></td>
+              </tr>
+              <tr>
+                <td><code>infer_storey_has_elements</code></td>
+                <td>Storey with elements</td>
+                <td>hasElements = true</td>
+              </tr>
+              <tr>
+                <td><code>infer_element_in_building</code></td>
+                <td>Element in storey</td>
+                <td>isInBuilding (transitive)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack -->
+  <section class="section" style="background:var(--bg-card);">
+    <div class="container">
+      <h2 class="section-title">Tech Stack</h2>
+      <p class="section-subtitle">검증된 오픈소스 기술 기반</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-header">Data Layer</div>
+          <div class="card-body">
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">IFC 파싱 + RDF 변환</p>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;justify-content:space-between;"><span>ifcopenshell</span><span class="badge badge-blue">0.8.4</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>rdflib</span><span class="badge badge-blue">7.5.0</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>owlrl</span><span class="badge badge-blue">6.0+</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>pyshacl</span><span class="badge badge-blue">0.26+</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">API Layer</div>
+          <div class="card-body">
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">REST + SPARQL 서빙</p>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;justify-content:space-between;"><span>FastAPI</span><span class="badge badge-green">latest</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>Uvicorn</span><span class="badge badge-green">latest</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>SPARQLWrapper</span><span class="badge badge-green">2.0+</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Infrastructure</div>
+          <div class="card-body">
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">배포 + 테스트</p>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;justify-content:space-between;"><span>Docker</span><span class="badge badge-purple">Compose</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>GraphDB</span><span class="badge badge-purple">10.6</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>pytest</span><span class="badge badge-purple">7.0+</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>GitHub Actions</span><span class="badge badge-purple">CI/CD</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Quick Start</h2>
+      <p class="section-subtitle">3단계로 시작하기</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">Local Development</div>
+          <div class="card-body">
+            <pre><code># 1. Clone & install
+git clone https://github.com/tygwan/bim-ontology.git
+cd bim-ontology
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Start server
+uvicorn src.api.server:app --reload
+
+# 3. Open dashboard
+open http://localhost:8000
+
+# 4. Run tests
+pytest tests/ -v</code></pre>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Docker</div>
+          <div class="card-body">
+            <pre><code># API only
+docker compose up --build
+
+# With GraphDB
+docker compose --profile graphdb up --build
+
+# Endpoints
+# http://localhost:8000       API + Dashboard
+# http://localhost:7200       GraphDB Workbench</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Performance -->
+  <section class="section" style="background:var(--bg-card);">
+    <div class="container">
+      <h2 class="section-title">Performance</h2>
+      <p class="section-subtitle">실측 벤치마크 결과</p>
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Value</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>IFC4 (224MB) conversion</td>
+                <td style="font-weight:700;color:var(--green);">1.3s</td>
+                <td style="color:var(--text-muted);">39,237 triples</td>
+              </tr>
+              <tr>
+                <td>IFC2X3 (828MB) conversion</td>
+                <td style="font-weight:700;color:var(--green);">38.1s</td>
+                <td style="color:var(--text-muted);">Streaming mode</td>
+              </tr>
+              <tr>
+                <td>SPARQL cache speedup</td>
+                <td style="font-weight:700;color:var(--amber);">14,869x</td>
+                <td style="color:var(--text-muted);">65ms → 0.004ms</td>
+              </tr>
+              <tr>
+                <td>OWL reasoning growth</td>
+                <td style="font-weight:700;color:var(--purple);">+66.7%</td>
+                <td style="color:var(--text-muted);">39K → 65K triples</td>
+              </tr>
+              <tr>
+                <td>Test coverage</td>
+                <td style="font-weight:700;">85%</td>
+                <td style="color:var(--text-muted);">91 tests</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Development Progress -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Development Progress</h2>
+      <p class="section-subtitle">Phase 0~14 완료 (93%)</p>
+      <div class="card">
+        <div class="card-body">
+          <!-- Progress bar -->
+          <div style="margin-bottom:24px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:0.85rem;font-weight:600;">Overall Progress</span>
+              <span style="font-size:0.85rem;color:var(--green);">93%</span>
+            </div>
+            <div style="height:8px;background:#334155;border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:93%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:4px;"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+            {[
+              { phase: '0-5', name: 'Core Pipeline', done: true },
+              { phase: '6-7', name: 'Integration & Deploy', done: true },
+              { phase: '8', name: 'CI Fix', done: true },
+              { phase: '9', name: 'Smart3D Classification', done: true },
+              { phase: '10', name: 'Property API', done: true },
+              { phase: '11', name: 'Schema Manager', done: true },
+              { phase: '12', name: 'Dashboard UI', done: true },
+              { phase: '13', name: 'GraphDB', done: true },
+              { phase: '14', name: 'SHACL Validation', done: true },
+              { phase: '15', name: 'Site & Docs', done: false },
+            ].map(p => (
+              <div style={`padding:10px;border-radius:8px;text-align:center;border:1px solid ${p.done ? '#166534' : '#334155'};background:${p.done ? '#14532d22' : 'transparent'};`}>
+                <div style={`font-size:0.65rem;color:${p.done ? 'var(--green)' : 'var(--text-dim)'};text-transform:uppercase;margin-bottom:2px;`}>Phase {p.phase}</div>
+                <div style="font-size:0.75rem;font-weight:600;">{p.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>

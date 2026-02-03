@@ -1,0 +1,437 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<Layout title="Dashboard Guide - BIM Ontology" description="BIM Ontology 7-Tab Dashboard 사용 가이드">
+  <section class="section" style="padding-top:48px;">
+    <div class="container">
+      <div style="margin-bottom:40px;">
+        <a href={base} style="font-size:0.8rem;color:var(--text-muted);">&larr; Back to Home</a>
+        <h1 style="font-size:2.2rem;font-weight:800;margin-top:12px;">Dashboard Guide</h1>
+        <p style="color:var(--text-muted);font-size:1rem;margin-top:8px;">
+          BIM Ontology 7-Tab 대시보드의 각 탭별 기능과 사용법을 안내합니다.
+        </p>
+      </div>
+
+      <!-- Table of Contents -->
+      <div class="card" style="margin-bottom:48px;">
+        <div class="card-header">Table of Contents</div>
+        <div class="card-body">
+          <ol style="padding-left:20px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <li><a href="#overview">Overview</a> — 통계 및 차트</li>
+            <li><a href="#buildings">Buildings</a> — 건물 계층 탐색</li>
+            <li><a href="#elements">Elements</a> — 요소 검색 및 필터</li>
+            <li><a href="#sparql">SPARQL</a> — 쿼리 에디터</li>
+            <li><a href="#properties">Properties</a> — 속성 조회</li>
+            <li><a href="#ontology">Ontology</a> — 스키마 편집</li>
+            <li><a href="#reasoning">Reasoning</a> — 추론 및 검증</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 1. Overview -->
+      <div id="overview" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-blue" style="font-size:0.85rem;padding:6px 14px;">1</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Overview Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              대시보드 진입 시 가장 먼저 표시되는 탭입니다. 로딩된 RDF 그래프의 전체 통계와 카테고리 분포를 시각적으로 확인할 수 있습니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--accent);">4개 통계 카드</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Total Triples, Physical Elements, Categories, Buildings 수치를 실시간 표시</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--accent);">Category Distribution (Doughnut Chart)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Chart.js 기반 도넛 차트로 29개 카테고리별 요소 비율 시각화. 범례 클릭으로 특정 카테고리 토글 가능.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--accent);">Top Categories (Bar Chart)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">상위 10개 카테고리를 가로 바 차트로 표시. 요소 수가 가장 많은 카테고리 순으로 정렬.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>서버 시작 후 브라우저에서 <code>http://localhost:8000</code> 접속</li>
+                  <li>Overview 탭이 자동 로딩 - 상단에 연결 상태(Connected / Disconnected) 확인</li>
+                  <li>통계 카드에서 전체 데이터 규모 파악</li>
+                  <li>도넛 차트에서 "Other" 비율 확인 → 분류 품질 판단</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-overview.png`} alt="Overview Tab" onerror="this.parentElement.innerHTML='<span>Overview Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-overview.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Buildings -->
+      <div id="buildings" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-green" style="font-size:0.85rem;padding:6px 14px;">2</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Buildings Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              IFC 건물 계층 구조(Project → Site → Building → BuildingStorey)를 트리 형태로 탐색합니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--green);">Building Hierarchy Tree</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">좌측 패널에 Project → Site → Building → Storey 계층 트리 표시. 각 노드에 색상 코딩된 타입 배지(PRJ, SITE, BLD, STY) 부여.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--green);">Storey Detail</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">노드 클릭 시 우측 패널에 상세 정보 표시. Building 선택 시 소속 Storey 목록과 각 층의 Elevation(표고) 표시.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--green);">Element Count</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">각 노드 옆에 포함된 요소 수 표시. 어떤 층에 요소가 집중되어 있는지 파악 가능.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>Buildings 탭 클릭 → 계층 트리 자동 로딩</li>
+                  <li>트리에서 Building 노드 클릭</li>
+                  <li>우측에 Storey 목록과 Elevation 확인</li>
+                  <li>Storey별 요소 수로 데이터 분포 파악</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-buildings.png`} alt="Buildings Tab" onerror="this.parentElement.innerHTML='<span>Buildings Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-buildings.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Elements -->
+      <div id="elements" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-amber" style="font-size:0.85rem;padding:6px 14px;">3</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Elements Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              모든 Physical Element를 테이블 형태로 조회하고, 카테고리 필터 + 이름 검색 + 페이지네이션으로 원하는 요소를 찾습니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--amber);">Category Filter</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">드롭다운에서 카테고리 선택(예: Pipe, Beam, Hanger). 각 옵션에 해당 카테고리의 요소 수 표시.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--amber);">Name Search</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">텍스트 입력으로 요소 이름 검색. 클라이언트 사이드 필터링으로 즉시 결과 반영.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--amber);">Element Table</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Name, Category(배지), Original Type, Global ID 4개 컬럼. 50개 단위 페이지네이션.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--amber);">Pagination</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Prev / Next 버튼으로 페이지 이동. 현재 표시 중인 요소 수와 페이지 번호 표시.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>Elements 탭 클릭 → 전체 요소 로딩</li>
+                  <li>카테고리 드롭다운에서 "Pipe" 선택 → Search 클릭</li>
+                  <li>파이프 요소만 필터링된 결과 확인</li>
+                  <li>특정 요소의 GlobalId를 복사 → Properties 탭에서 상세 조회</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-elements.png`} alt="Elements Tab" onerror="this.parentElement.innerHTML='<span>Elements Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-elements.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. SPARQL -->
+      <div id="sparql" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-purple" style="font-size:0.85rem;padding:6px 14px;">4</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">SPARQL Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              임의의 SPARQL 쿼리를 작성하고 실행하여 RDF 그래프를 자유롭게 탐색합니다. 6개의 기본 쿼리 템플릿을 제공합니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--purple);">SPARQL Editor</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">모노스페이스 폰트의 텍스트 에디터. PREFIX 자동 포함. Execute 버튼 또는 직접 쿼리 입력.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--purple);">6 Query Templates</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
+                      우측 패널에 6개 프리셋: Category Statistics, Building Hierarchy, Elements by Storey, Pipe Elements, All Properties of Element, Structural Elements (after reasoning). 클릭 시 에디터에 자동 삽입.
+                    </p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--purple);">Results Table</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">쿼리 결과를 동적 테이블로 표시. URI는 자동으로 로컬 이름으로 축약. 행 수와 실행 시간(ms) 표시.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>SPARQL 탭 클릭</li>
+                  <li>우측에서 "Category Statistics" 템플릿 클릭</li>
+                  <li>Execute 버튼 클릭 → 카테고리별 요소 수 결과 표시</li>
+                  <li>쿼리를 수정하여 커스텀 분석 수행</li>
+                  <li>"Structural Elements" 템플릿은 Reasoning 실행 후 사용</li>
+                </ol>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 가능한 PREFIX</div>
+              <div class="card-body">
+                <pre style="font-size:0.8rem;"><code>PREFIX bim:  &lt;http://example.org/bim-ontology/schema#&gt;
+PREFIX rdf:  &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
+PREFIX rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;
+PREFIX sp3d: &lt;http://example.org/bim-ontology/sp3d#&gt;</code></pre>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-sparql.png`} alt="SPARQL Tab" onerror="this.parentElement.innerHTML='<span>SPARQL Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-sparql.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Properties -->
+      <div id="properties" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-blue" style="font-size:0.85rem;padding:6px 14px;">5</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Properties Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              개별 요소의 PropertySet을 조회하고, 속성 키워드로 검색하며, Smart3D Plant(SP3D) 데이터 요약을 확인합니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--accent);">Property Lookup (GlobalId)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">요소의 GlobalId를 입력하고 Lookup 클릭. 해당 요소에 연결된 모든 PropertySet과 속성값을 표시.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--accent);">Property Search (Key)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">속성 키 이름(예: "Weight", "Material")으로 검색. 해당 속성을 가진 모든 요소와 PropertySet, 값을 테이블로 표시. 최대 50개 결과.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--accent);">Smart3D Plant Data Summary</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">하단에 SP3D PropertySet 요약. 전체 PropertySet 수 vs. Plant(SP3D) PropertySet 수 비교. SP3D PropertySet별 속성 수 테이블.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>Elements 탭에서 관심 요소의 GlobalId 복사</li>
+                  <li>Properties 탭 → GlobalId 입력 → Lookup 클릭</li>
+                  <li>PropertySet별로 그룹화된 속성 확인</li>
+                  <li>또는 "Weight" 등 속성 키로 검색하여 전체 요소에서 해당 속성 조회</li>
+                  <li>하단의 Plant Data Summary에서 SP3D 데이터 현황 확인</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-properties.png`} alt="Properties Tab" onerror="this.parentElement.innerHTML='<span>Properties Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-properties.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Ontology -->
+      <div id="ontology" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-green" style="font-size:0.85rem;padding:6px 14px;">6</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Ontology Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              Palantir Foundry 영감의 동적 온톨로지 편집기. OWL 클래스(Object Types), 관계(Link Types), 분류 규칙을 런타임에 수정할 수 있습니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--green);">Object Types (Classes)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">BIM 스키마의 OWL Class 목록. "+ New Type" 버튼으로 새 클래스 생성(이름, 부모 클래스 지정). 테이블에서 Name, Parent, Label 확인.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--green);">Link Types (Relations)</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">OWL ObjectProperty(관계) 목록. "+ New Link" 버튼으로 새 관계 생성(이름, Domain, Range 지정). Inverse 관계 자동 설정.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--green);">Classification Rules Editor</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">JSON 에디터에서 29개 분류 규칙을 직접 편집. 카테고리명 → 정규식 패턴 배열 형태. "Save Rules" 버튼으로 즉시 적용.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--green);">Schema Import / Export</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Export: 현재 스키마를 JSON 파일로 다운로드. Import: JSON 파일 업로드로 스키마 복원. Apply to Graph: 커스텀 스키마를 RDF 그래프에 적용.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>Ontology 탭 클릭 → Object Types, Links, Rules 자동 로딩</li>
+                  <li>"+ New Type" → 이름: "HVACElement", Parent: "MEPElement" → 생성</li>
+                  <li>Classification Rules에서 "HVAC": ["hvac", "air.*handler"] 패턴 추가</li>
+                  <li>"Save Rules" 클릭 → "Apply to Graph" 클릭으로 그래프에 적용</li>
+                  <li>"Export" 클릭으로 스키마 백업</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-ontology.png`} alt="Ontology Tab" onerror="this.parentElement.innerHTML='<span>Ontology Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-ontology.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Reasoning -->
+      <div id="reasoning" style="margin-bottom:64px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span class="badge badge-red" style="font-size:0.85rem;padding:6px 14px;">7</span>
+          <h2 style="font-size:1.5rem;font-weight:700;">Reasoning Tab</h2>
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+              OWL/RDFS 추론 엔진을 실행하여 암묵적 지식을 명시적 트리플로 변환하고, SHACL Shape 검증을 수행합니다.
+            </p>
+            <div class="card">
+              <div class="card-header">주요 기능</div>
+              <div class="card-body">
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                  <li>
+                    <strong style="color:var(--red);">Run Reasoning</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">버튼 클릭으로 owlrl RDFS/OWL 추론 + 7개 커스텀 SPARQL CONSTRUCT 규칙 실행. 실행 중 스피너 표시.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--red);">Reasoning Results</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">추론 전/후 트리플 수 비교. 추론된 트리플 수와 실행 시간 표시. 적용된 규칙 목록 확인.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--red);">Inferred Types Query</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">추론 완료 후 StructuralElement, MEPElement, AccessElement 등 추론된 타입별 요소 수를 자동 쿼리하여 표시.</p>
+                  </li>
+                  <li>
+                    <strong style="color:var(--red);">SHACL Validation</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">API 엔드포인트 <code>POST /api/reasoning/validate</code>로 SHACL Shape 제약조건 검증. Conforms 여부와 Violation 수 반환.</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px;">
+              <div class="card-header">사용 시나리오</div>
+              <div class="card-body" style="font-size:0.85rem;color:var(--text-muted);">
+                <ol style="padding-left:16px;">
+                  <li>Reasoning 탭 클릭</li>
+                  <li>"Run Reasoning" 클릭 → 추론 실행 (수초 소요)</li>
+                  <li>Before/After 트리플 수 비교 (약 +66.7% 증가 예상)</li>
+                  <li>Inferred Types 테이블에서 StructuralElement, MEPElement 등 확인</li>
+                  <li>SPARQL 탭으로 이동 → "Structural Elements" 템플릿으로 추론 결과 탐색</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screenshot-placeholder">
+              <img src={`${base}screenshots/tab-reasoning.png`} alt="Reasoning Tab" onerror="this.parentElement.innerHTML='<span>Reasoning Tab Screenshot<br/><small style=color:#475569>(screenshots/tab-reasoning.png)</small></span>'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screenshots Request -->
+      <div class="card" style="border-color:var(--amber);">
+        <div class="card-header" style="color:var(--amber);">Screenshots Needed</div>
+        <div class="card-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
+            아래 7개 스크린샷을 <code>site/public/screenshots/</code> 폴더에 추가하면 이 가이드에 자동으로 반영됩니다:
+          </p>
+          <table>
+            <thead>
+              <tr><th>File</th><th>Content</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>dashboard-overview.png</code></td><td>메인 페이지 Hero 영역용 전체 대시보드 모습</td></tr>
+              <tr><td><code>tab-overview.png</code></td><td>Overview 탭: 4개 통계카드 + 도넛/바 차트가 보이는 화면</td></tr>
+              <tr><td><code>tab-buildings.png</code></td><td>Buildings 탭: 좌측 계층 트리 + 우측 Storey 상세</td></tr>
+              <tr><td><code>tab-elements.png</code></td><td>Elements 탭: 카테고리 필터 적용된 요소 테이블</td></tr>
+              <tr><td><code>tab-sparql.png</code></td><td>SPARQL 탭: 쿼리 에디터 + 실행 결과 테이블</td></tr>
+              <tr><td><code>tab-properties.png</code></td><td>Properties 탭: GlobalId 조회 결과 또는 Property Search 결과</td></tr>
+              <tr><td><code>tab-ontology.png</code></td><td>Ontology 탭: Object Types + Classification Rules 편집기</td></tr>
+              <tr><td><code>tab-reasoning.png</code></td><td>Reasoning 탭: 추론 실행 후 Before/After 통계</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</Layout>
