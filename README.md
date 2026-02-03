@@ -1,118 +1,124 @@
 # BIM Ontology
 
-IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고 SPARQL로 쿼리하는 파이프라인.
+> IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고, SPARQL 쿼리 + 동적 스키마 편집 + SHACL 검증을 제공하는 시맨틱 BIM 파이프라인
 
-## Overview
-
-건설 산업의 BIM 데이터(IFC 파일)를 시맨틱 웹 기술로 변환하여 의미론적 쿼리를 가능하게 합니다.
+IFC 파일(Navisworks/Smart Plant 3D 내보내기 포함)을 ifcOWL 기반 RDF 트리플로 변환하여 시맨틱 웹 기술로 건설 데이터를 탐색, 추론, 검증합니다.
 
 ```
-IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL Query
+IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL / REST API / Dashboard
+                                               ↓
+                                    [OWLReasoner] → Inferred triples
+                                    [SHACLValidator] → Validation report
+                                    [OntologySchemaManager] → Dynamic schema editing
 ```
 
 ## Features
 
-- **IFC 파싱**: ifcopenshell 기반 IFC4/IFC2X3 파일 파싱
-- **RDF 변환**: ifcOWL 네임스페이스 기반 RDF 트리플 생성
-- **이름 기반 분류**: Navisworks 내보내기로 손실된 타입 정보를 이름 패턴으로 복원
-- **SPARQL 쿼리**: rdflib 기반 로컬 트리플 스토어에서 쿼리 실행
-- **다중 직렬화**: Turtle, RDF/XML, JSON-LD, N-Triples 지원
-- **OWL/RDFS 추론**: owlrl 기반 추론 엔진 (RDFS subClassOf, OWL inverseOf, 커스텀 CONSTRUCT 규칙)
-- **쿼리 캐싱**: LRU 인메모리 캐시 (14,800x+ 속도 향상)
-- **스트리밍 변환**: 배치 단위 대용량 IFC 파일 처리
-- **웹 대시보드**: 건물 계층, 요소 탐색, SPARQL 에디터, 추론 실행 UI
-- **Docker 지원**: 단일 컨테이너 배포
+### Core Pipeline
+- **IFC Parsing** - ifcopenshell 기반 IFC4/IFC2X3 파일 파싱
+- **RDF Conversion** - ifcOWL 네임스페이스 기반 RDF 트리플 생성
+- **Name-based Classification** - Navisworks 내보내기로 손실된 타입을 29개 카테고리로 복원
+- **SPARQL Queries** - rdflib 기반 로컬 트리플 스토어
+- **Streaming Conversion** - 배치 단위 대용량 IFC 파일 처리 (828MB+)
+
+### Smart3D Plant Support
+- **10 Plant-specific Patterns** - MemberSystem, Hanger, PipeFitting, Flange, Nozzle 등
+- **SP3D PropertySet Detection** - Smart Plant 3D 속성 자동 태깅
+- **Property API** - 요소별 속성 조회 및 검색
+
+### Ontology Management (Palantir Foundry-inspired)
+- **Dynamic Schema Editing** - REST API로 Object Type, Property Type, Link Type CRUD
+- **Mutable Classification Rules** - JSON 파일 기반 분류 규칙 런타임 변경
+- **Schema Import/Export** - JSON 형식 스키마 내보내기/가져오기
+
+### Inference & Validation
+- **OWL/RDFS Reasoning** - owlrl 기반 (StructuralElement, MEPElement, PipingElement, PlantSupportElement 등)
+- **SHACL Validation** - pyshacl 기반 형상 제약조건 검증
+- **Query Caching** - LRU 인메모리 캐시 (14,800x+ 속도 향상)
+
+### Infrastructure
+- **Web Dashboard** - 7탭 대시보드 (Overview, Buildings, Elements, SPARQL, Properties, Ontology, Reasoning)
+- **GraphDB Integration** - 외부 트리플스토어 어댑터 (SPARQLWrapper)
+- **Docker Support** - API + GraphDB (optional) 컨테이너
+- **CI/CD** - GitHub Actions (IFC 비의존 테스트 분리)
 
 ## Quick Start
 
 ```bash
-# 가상환경 생성 및 패키지 설치
+# 1. 가상환경 생성 및 패키지 설치
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 테스트 실행
+# 2. 서버 시작 (data/rdf/nwd4op-12.ttl에서 자동 로딩)
+uvicorn src.api.server:app --reload
+
+# 3. 브라우저에서 대시보드 열기
+open http://localhost:8000
+
+# 4. 테스트 실행
 pytest tests/ -v
 ```
 
+### Docker
+
+```bash
+# API만 실행
+docker compose up --build
+
+# GraphDB 포함 실행
+docker compose --profile graphdb up --build
+
+# http://localhost:8000 (API + Dashboard)
+# http://localhost:7200 (GraphDB Workbench)
+```
+
 ## Usage
+
+### Python API
 
 ```python
 from src.parser import IFCParser
 from src.converter import RDFConverter
 from src.storage import TripleStore
 
-# 1. IFC 파일 파싱
+# 1. IFC 파싱
 parser = IFCParser("references/sample.ifc")
 parser.open()
-
-print(f"Schema: {parser.get_schema()}")
-print(f"Entities: {parser.get_entity_count()}")
 
 # 2. RDF 변환
 converter = RDFConverter(schema=parser.get_schema())
 graph = converter.convert_file(parser)
-
-print(f"Triples: {len(graph)}")
 
 # 3. SPARQL 쿼리
 store = TripleStore(graph)
 results = store.query("""
     PREFIX bim: <http://example.org/bim-ontology/schema#>
     SELECT ?cat (COUNT(?e) AS ?num)
-    WHERE {
-        ?e bim:hasCategory ?cat .
-    }
-    GROUP BY ?cat
-    ORDER BY DESC(?num)
+    WHERE { ?e bim:hasCategory ?cat }
+    GROUP BY ?cat ORDER BY DESC(?num)
 """)
 
-for row in results:
-    print(f"  {row['cat']}: {row['num']}")
+# 4. OWL 추론
+from src.inference.reasoner import OWLReasoner
+reasoner = OWLReasoner(store.graph)
+result = reasoner.run_all()  # StructuralElement, MEPElement, PipingElement 등 추론
 
-# 4. 저장
-store.save("output.ttl", fmt="turtle")
+# 5. SHACL 검증
+from src.inference.shacl_validator import validate
+report = validate(store.graph)
+print(f"Conforms: {report['conforms']}, Violations: {report['violations_count']}")
 ```
 
-## API Server
-
-```bash
-# 서버 시작 (IFC 파일 자동 변환/캐싱)
-uvicorn src.api.server:app --reload
-
-# 대시보드: http://localhost:8000/
-# API 문서: http://localhost:8000/docs
-```
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | 웹 대시보드 |
-| POST | `/api/sparql` | SPARQL 쿼리 실행 |
-| GET | `/api/buildings` | 건물 목록 |
-| GET | `/api/storeys` | 층 목록 |
-| GET | `/api/elements?category=Pipe` | 요소 목록 (카테고리 필터) |
-| GET | `/api/statistics` | 전체 통계 |
-| GET | `/api/hierarchy` | 건물 계층 구조 |
-| POST | `/api/reasoning` | OWL/RDFS 추론 실행 |
-
-### Docker
-
-```bash
-# Docker로 실행
-docker compose up --build
-
-# http://localhost:8000 으로 접속
-```
-
-## Python Client
+### Python Client
 
 ```python
 from src.clients.python import BIMOntologyClient
 
-# 로컬 모드 (IFC 파일 직접 사용)
+# 로컬 모드
 client = BIMOntologyClient.from_ifc("references/sample.ifc")
 
-# 원격 모드 (API 서버 연결)
+# 원격 모드
 client = BIMOntologyClient.from_api("http://localhost:8000")
 
 stats = client.get_statistics()
@@ -120,50 +126,105 @@ pipes = client.get_elements(category="Pipe", limit=10)
 hierarchy = client.get_hierarchy()
 ```
 
-## Project Structure
+## API Endpoints
+
+### Core API
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Web dashboard |
+| GET | `/health` | Health check |
+| POST | `/api/sparql` | SPARQL query execution |
+| GET | `/api/buildings` | Building list |
+| GET | `/api/storeys` | Storey list |
+| GET | `/api/elements?category=Pipe` | Element list (category filter) |
+| GET | `/api/statistics` | Overall statistics |
+| GET | `/api/hierarchy` | Building hierarchy |
+
+### Reasoning & Validation
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/reasoning` | Run OWL/RDFS inference |
+| POST | `/api/reasoning/validate` | Run SHACL validation |
+
+### Properties (Smart3D Plant)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/properties/{global_id}` | Element PropertySets |
+| GET | `/api/properties/plant-data` | SP3D data summary |
+| GET | `/api/properties/search?key=Weight` | Property search |
+
+### Ontology Editor
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/ontology/types` | Object Types CRUD |
+| PUT/DELETE | `/api/ontology/types/{name}` | Update/delete type |
+| GET/POST | `/api/ontology/properties` | Property Types CRUD |
+| GET/POST | `/api/ontology/links` | Link Types CRUD |
+| GET/PUT | `/api/ontology/rules` | Classification rules |
+| POST | `/api/ontology/apply` | Apply schema to graph |
+| GET | `/api/ontology/export` | Export schema (JSON) |
+| POST | `/api/ontology/import` | Import schema (JSON) |
+
+## Architecture
 
 ```
 bim-ontology/
 ├── src/
-│   ├── parser/
-│   │   └── ifc_parser.py       # IFC 파싱 모듈
+│   ├── parser/ifc_parser.py          # IFC parsing (IFC4/IFC2X3)
 │   ├── converter/
-│   │   ├── ifc_to_rdf.py       # RDF 변환 메인
-│   │   ├── mapping.py          # IFC → ifcOWL 매핑 룰
-│   │   └── namespace_manager.py # 네임스페이스 관리
+│   │   ├── ifc_to_rdf.py             # RDF conversion + SP3D detection
+│   │   ├── streaming_converter.py    # Large file streaming
+│   │   ├── mapping.py                # IFC → ifcOWL mappings
+│   │   └── namespace_manager.py      # BIM/SP3D/BOT namespaces
 │   ├── storage/
-│   │   └── triple_store.py     # SPARQL 트리플 스토어
-│   ├── cache/
-│   │   └── query_cache.py      # LRU 쿼리 캐시
+│   │   ├── base_store.py             # ABC interface
+│   │   ├── triple_store.py           # rdflib local store
+│   │   └── graphdb_store.py          # GraphDB adapter
 │   ├── inference/
-│   │   └── reasoner.py         # OWL/RDFS 추론 엔진
+│   │   ├── reasoner.py               # OWL/RDFS + 7 custom rules
+│   │   └── shacl_validator.py        # SHACL shape validation
+│   ├── ontology/
+│   │   └── schema_manager.py         # Dynamic schema CRUD
+│   ├── cache/query_cache.py          # LRU query cache
 │   ├── api/
-│   │   ├── server.py           # FastAPI 서버
-│   │   ├── routes/             # SPARQL, Buildings, Statistics, Reasoning
-│   │   ├── models/             # Pydantic 모델
-│   │   └── queries/            # SPARQL 쿼리 템플릿
+│   │   ├── server.py                 # FastAPI server
+│   │   └── routes/                   # sparql, buildings, statistics,
+│   │                                 # reasoning, properties, ontology_editor
 │   ├── dashboard/
-│   │   ├── index.html          # 웹 대시보드
-│   │   └── app.js              # 대시보드 로직
-│   └── clients/
-│       └── python/client.py    # Python 클라이언트
-├── examples/                   # 사용 예제 5개
-├── scripts/                    # 분석/벤치마크 스크립트
-├── tests/                      # 91개 테스트
+│   │   ├── index.html                # 7-tab dashboard
+│   │   └── app.js                    # Dashboard logic
+│   └── clients/python/client.py      # Python client
 ├── data/
-│   └── rdf/                    # 변환된 RDF 파일
-├── docs/
-│   ├── PRD.md                  # 제품 요구사항
-│   ├── TECH-SPEC.md            # 기술 설계서
-│   ├── PROGRESS.md             # 진행 현황
-│   ├── DEVLOG.md               # 개발 일지 및 피드백
-│   └── phases/                 # Phase별 상세 문서
-├── references/                 # IFC 샘플 파일 및 논문
-├── Dockerfile                 # Docker 컨테이너 설정
-├── docker-compose.yml         # Docker Compose 서비스 구성
-├── requirements.txt
-└── README.md
+│   ├── rdf/nwd4op-12.ttl             # Pre-converted RDF cache
+│   └── ontology/                     # SHACL shapes, rules, custom schema
+├── tests/                            # 91 tests (requires_ifc marker)
+├── docker-compose.yml                # API + GraphDB (optional)
+└── requirements.txt                  # Python dependencies
 ```
+
+## Classification System
+
+29 BIM element categories (order-sensitive, specific before generic):
+
+| Group | Categories |
+|-------|-----------|
+| **Smart3D Plant** | MemberSystem, Hanger, PipeFitting, Flange, ProcessUnit, Conduit, Assembly, Brace, GroutPad, Nozzle |
+| **Structural** | Slab, Wall, Column, Beam, Foundation, Structural |
+| **MEP** | Pipe, Duct, CableTray, Insulation, Valve, Pump, Equipment |
+| **Access** | Railing, Stair |
+| **Other** | Support, MemberPart, Aspect, Geometry |
+
+## Reasoning Rules
+
+| Rule | Description |
+|------|-------------|
+| `infer_structural_element` | Beam, Column, Slab, Wall, Foundation -> StructuralElement |
+| `infer_mep_element` | Pipe, Duct, CableTray, Valve, Pump, Insulation, Equipment -> MEPElement |
+| `infer_access_element` | Stair, Railing -> AccessElement |
+| `infer_plant_support_element` | Hanger, Brace, MemberSystem, Support -> PlantSupportElement |
+| `infer_piping_element` | PipeFitting, Flange, Nozzle, Valve, Pipe -> PipingElement |
+| `infer_storey_has_elements` | Storey with elements -> hasElements=true |
+| `infer_element_in_building` | Element in storey -> isInBuilding (transitive) |
 
 ## Test Data
 
@@ -172,51 +233,28 @@ bim-ontology/
 | nwd4op-12.ifc | IFC4 | 224MB | 66,538 | 3,911 (Equipment Systems) |
 | nwd23op-12.ifc | IFC2X3 | 828MB | 16,945,319 | 3,980 (Structure Systems) |
 
-## Test Results
-
-- **91/91 tests passed** (100% pass rate)
-- **Coverage: 85%** (target: 70%)
-
-| Module | Coverage |
-|--------|----------|
-| query_cache.py | 100% |
-| namespace_manager.py | 100% |
-| triple_store.py | 95% |
-| api routes | 96~100% |
-| streaming_converter.py | 88% |
-| reasoner.py | 88% |
-| ifc_to_rdf.py | 86% |
-| ifc_parser.py | 85% |
-| client.py | 82% |
-
-## Performance Benchmarks
+## Performance
 
 | Metric | Value |
 |--------|-------|
-| IFC4 (224MB) 변환 | 1.3s / 39,237 triples |
-| IFC2X3 (828MB) 변환 | 38.1s / 39,237 triples |
-| SPARQL 캐시 속도 향상 | 14,869x (65ms -> 0.004ms) |
-| OWL 추론 트리플 증가 | +66.7% (39K -> 65K) |
-
-## Known Issues
-
-자세한 내용은 [docs/DEVLOG.md](docs/DEVLOG.md) 참조.
-
-| ID | Issue | Status |
-|----|-------|--------|
-| F-002 | Navisworks 내보내기로 모든 요소가 IfcBuildingElementProxy로 타입 손실 | 이름 기반 분류로 우회 |
-| F-003 | 속성셋 내부 값이 비어 있어 속성 기반 쿼리 제한 | 확인됨 |
-| F-004 | GlobalId 없는 비-IfcRoot 엔티티에서 AttributeError | 수정됨 |
-| F-005 | 828MB 파일의 1,700만 엔티티 중 95%가 기하 형상 | 기하 제외로 대응 |
+| IFC4 (224MB) conversion | 1.3s / 39,237 triples |
+| IFC2X3 (828MB) conversion | 38.1s / 39,237 triples |
+| SPARQL cache speedup | 14,869x (65ms -> 0.004ms) |
+| OWL reasoning triple increase | +66.7% (39K -> 65K) |
+| Test coverage | 85% (91 tests) |
 
 ## Tech Stack
 
-- **Python 3.12**
-- **ifcopenshell** 0.8.4 - IFC 파일 파싱
-- **rdflib** 7.5.0 - RDF 그래프 및 SPARQL
-- **owlrl** 6.0+ - OWL/RDFS 추론
-- **FastAPI** - REST/SPARQL API
-- **pytest** - 테스트 프레임워크
+| Layer | Technology |
+|-------|-----------|
+| IFC Parsing | ifcopenshell 0.8.4 |
+| RDF/SPARQL | rdflib 7.5.0 |
+| OWL/RDFS Reasoning | owlrl 6.0+ |
+| SHACL Validation | pyshacl 0.26+ |
+| Web Framework | FastAPI |
+| External Triplestore | GraphDB 10.6 (optional) |
+| Testing | pytest 7.0+ |
+| Container | Docker + Docker Compose |
 
 ## References
 

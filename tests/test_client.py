@@ -11,6 +11,7 @@ from src.parser import IFCParser
 from src.converter import RDFConverter
 from src.storage import TripleStore
 from src.clients.python import BIMOntologyClient
+from conftest import requires_ifc
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 
@@ -26,6 +27,7 @@ def client():
     return BIMOntologyClient(store=store)
 
 
+@requires_ifc
 class TestClientInit:
     def test_from_ifc(self):
         c = BIMOntologyClient.from_ifc(IFC4_FILE)
@@ -41,6 +43,7 @@ class TestClientInit:
         assert not c.is_local
 
 
+@requires_ifc
 class TestClientQueries:
     def test_get_buildings(self, client):
         buildings = client.get_buildings()

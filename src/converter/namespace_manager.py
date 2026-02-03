@@ -20,6 +20,9 @@ EXPRESS = Namespace("https://w3id.org/express#")
 # Linked Building Data 네임스페이스
 BOT = Namespace("https://w3id.org/bot#")
 
+# Smart Plant 3D 네임스페이스
+SP3D = Namespace("http://example.org/bim-ontology/sp3d#")
+
 # 스키마별 네임스페이스 매핑
 SCHEMA_NAMESPACES = {
     "IFC4": IFC4,
@@ -64,6 +67,7 @@ def bind_namespaces(graph: Graph, schema: str = "IFC4") -> Graph:
     graph.bind("inst", INST)
     graph.bind("express", EXPRESS)
     graph.bind("bot", BOT)
+    graph.bind("sp3d", SP3D)
     graph.bind("owl", OWL)
     graph.bind("rdfs", RDFS)
     graph.bind("rdf", RDF)

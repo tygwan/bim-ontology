@@ -11,7 +11,7 @@ from typing import Any
 from rdflib import Graph, Literal, URIRef, RDF, RDFS, OWL, XSD
 
 from .namespace_manager import (
-    BIM, INST, BOT, bind_namespaces, get_ifc_namespace,
+    BIM, INST, BOT, SP3D, bind_namespaces, get_ifc_namespace,
 )
 from .mapping import (
     SPATIAL_TYPES, CONVERTIBLE_TYPES, GEOMETRY_TYPES,
@@ -287,6 +287,15 @@ class RDFConverter:
             if pset_def.Name:
                 g.add((pset_uri, BIM.hasName, Literal(pset_def.Name)))
                 g.add((pset_uri, RDFS.label, Literal(pset_def.Name)))
+
+                # Smart Plant 3D / Smart3D PropertySet 감지
+                is_sp3d = (
+                    pset_def.Name.startswith("SP3D")
+                    or "SmartPlant" in pset_def.Name
+                    or "Smart3D" in pset_def.Name
+                )
+                if is_sp3d:
+                    g.add((pset_uri, RDF.type, BIM.PlantPropertySet))
 
             # 속성 변환
             for prop in pset_def.HasProperties:

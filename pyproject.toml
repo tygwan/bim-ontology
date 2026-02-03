@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+markers = [
+    "requires_ifc: marks tests that require IFC test data (deselect with '-m \"not requires_ifc\"')",
+]

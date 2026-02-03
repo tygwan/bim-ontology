@@ -1,0 +1,57 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix bim: <http://example.org/bim-ontology/schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# BIMElement: must have hasGlobalId (xsd:string)
+bim:BIMElementShape
+    a sh:NodeShape ;
+    sh:targetClass bim:BIMElement ;
+    sh:property [
+        sh:path bim:hasGlobalId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "BIMElement must have a GlobalId (xsd:string)" ;
+    ] .
+
+# PhysicalElement: must have hasOriginalType
+bim:PhysicalElementShape
+    a sh:NodeShape ;
+    sh:targetClass bim:PhysicalElement ;
+    sh:property [
+        sh:path bim:hasOriginalType ;
+        sh:minCount 1 ;
+        sh:message "PhysicalElement must have an original IFC type" ;
+    ] .
+
+# BuildingStorey: must have hasElevation (xsd:double)
+bim:BuildingStoreyShape
+    a sh:NodeShape ;
+    sh:targetClass bim:BuildingStorey ;
+    sh:property [
+        sh:path bim:hasElevation ;
+        sh:datatype xsd:double ;
+        sh:minCount 1 ;
+        sh:message "BuildingStorey must have an elevation (xsd:double)" ;
+    ] .
+
+# PropertySet: must have at least one hasProperty
+bim:PropertySetShape
+    a sh:NodeShape ;
+    sh:targetClass bim:PropertySet ;
+    sh:property [
+        sh:path bim:hasProperty ;
+        sh:minCount 1 ;
+        sh:message "PropertySet must have at least one property" ;
+    ] .
+
+# PlantPropertySet: must have hasName
+bim:PlantPropertySetShape
+    a sh:NodeShape ;
+    sh:targetClass bim:PlantPropertySet ;
+    sh:property [
+        sh:path bim:hasName ;
+        sh:minCount 1 ;
+        sh:message "PlantPropertySet must have a name" ;
+    ] .

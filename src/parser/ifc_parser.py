@@ -16,12 +16,25 @@ import ifcopenshell
 logger = logging.getLogger(__name__)
 
 # Navisworks 내보내기에서 손실된 타입을 이름 패턴으로 복원하기 위한 분류 규칙
+# 순서 중요: 구체적인 패턴이 범용 패턴보다 먼저 와야 함 (예: PipeFitting > Pipe)
 CATEGORY_PATTERNS: dict[str, list[str]] = {
+    # -- Smart3D Plant / Navisworks 특화 패턴 --
+    "MemberSystem": [r"membersystem", r"member\s*system"],
+    "Hanger": [r"hanger", r"spring\s*hanger", r"clamp"],
+    "PipeFitting": [r"pipe\s*fitting", r"fitting", r"elbow", r"tee\b", r"reducer"],
+    "Flange": [r"flange"],
+    "ProcessUnit": [r"process\s*unit"],
+    "Conduit": [r"conduit", r"wireway"],
+    "Assembly": [r"assembly"],
+    "Brace": [r"brace", r"bracing"],
+    "GroutPad": [r"grout\s*pad", r"grout"],
+    "Nozzle": [r"nozzle"],
+    # -- 기본 구조/건축 패턴 (순서 재배치) --
     "Slab": [r"slab", r"floor"],
     "Wall": [r"wall", r"partition"],
     "Column": [r"column", r"pillar"],
     "Beam": [r"beam", r"girder", r"joist"],
-    "Pipe": [r"pipe", r"piping"],
+    "Pipe": [r"pipe", r"piping"],          # PipeFitting 이후
     "Duct": [r"duct"],
     "CableTray": [r"cable\s*tray", r"cable"],
     "Insulation": [r"insulation"],
@@ -31,6 +44,7 @@ CATEGORY_PATTERNS: dict[str, list[str]] = {
     "Foundation": [r"foundation", r"footing"],
     "Railing": [r"railing", r"handrail"],
     "Stair": [r"stair"],
+    "Support": [r"support"],               # Hanger 이후 (구체적 지지물 우선)
     "MemberPart": [r"memberpart"],
     "Structural": [r"structural"],
     "Aspect": [r"aspect"],

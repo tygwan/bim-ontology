@@ -8,4 +8,26 @@ services:
       - ./data:/app/data
     environment:
       - LOG_LEVEL=info
+      - TRIPLESTORE_BACKEND=${TRIPLESTORE_BACKEND:-local}
+      - GRAPHDB_URL=http://graphdb:7200
+      - GRAPHDB_REPO=bim-ontology
+    depends_on:
+      graphdb:
+        condition: service_started
+        required: false
     restart: unless-stopped
+
+  graphdb:
+    image: ontotext/graphdb:10.6
+    ports:
+      - "${GRAPHDB_PORT:-7200}:7200"
+    volumes:
+      - graphdb_data:/opt/graphdb/home
+    environment:
+      - GDB_HEAP_SIZE=2g
+    profiles:
+      - graphdb
+    restart: unless-stopped
+
+volumes:
+  graphdb_data:

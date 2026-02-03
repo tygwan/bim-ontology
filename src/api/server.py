@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .routes import sparql, buildings, statistics
-from .routes import reasoning
+from .routes import reasoning, properties, ontology_editor
 from .utils.query_executor import init_store
 from ..parser import IFCParser
 from ..converter import RDFConverter
@@ -104,6 +104,8 @@ def create_app(store: TripleStore | None = None) -> FastAPI:
     app.include_router(buildings.router, prefix="/api", tags=["Buildings"])
     app.include_router(statistics.router, prefix="/api", tags=["Statistics"])
     app.include_router(reasoning.router, prefix="/api", tags=["Reasoning"])
+    app.include_router(properties.router, prefix="/api", tags=["Properties"])
+    app.include_router(ontology_editor.router, prefix="/api", tags=["Ontology"])
 
     @app.get("/health", tags=["Health"])
     async def health():

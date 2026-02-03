@@ -15,6 +15,7 @@ from src.parser import IFCParser
 from src.converter import RDFConverter
 from src.converter.namespace_manager import BIM, INST
 from src.storage import TripleStore
+from conftest import requires_ifc
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 IFC2X3_FILE = "references/nwd23op-12.ifc"
@@ -44,6 +45,7 @@ def store(converted_graph):
 
 # ---------- IFC Parser 테스트 ----------
 
+@requires_ifc
 class TestIFCParser:
     def test_open_ifc4(self, ifc4_parser):
         assert ifc4_parser.get_schema() == "IFC4"
@@ -97,6 +99,7 @@ class TestIFCParser:
 
 # ---------- RDF Converter 테스트 ----------
 
+@requires_ifc
 class TestRDFConverter:
     def test_conversion_produces_triples(self, converted_graph):
         assert len(converted_graph) > 1000
@@ -156,6 +159,7 @@ class TestRDFConverter:
 
 # ---------- TripleStore 테스트 ----------
 
+@requires_ifc
 class TestTripleStore:
     def test_count(self, store):
         assert store.count() > 1000
@@ -213,6 +217,7 @@ class TestTripleStore:
 
 # ---------- E2E 파이프라인 테스트 ----------
 
+@requires_ifc
 class TestEndToEnd:
     def test_full_pipeline(self, ifc4_parser, tmp_path):
         """IFC → RDF → Store → SPARQL → 파일 저장 전체 파이프라인."""

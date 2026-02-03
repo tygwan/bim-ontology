@@ -2,7 +2,7 @@
 
 rdflib 기반 인메모리/파일 트리플 스토어입니다.
 SPARQL 쿼리 실행, 그래프 저장/로딩, 배치 처리를 지원합니다.
-추후 GraphDB 등 외부 스토어 연동 시 이 인터페이스를 확장합니다.
+BaseTripleStore를 상속하여 GraphDB와 동일한 인터페이스를 제공합니다.
 """
 
 import logging
@@ -13,10 +13,12 @@ from typing import Any
 from rdflib import Graph, URIRef, Literal, Namespace
 from rdflib.query import Result
 
+from .base_store import BaseTripleStore
+
 logger = logging.getLogger(__name__)
 
 
-class TripleStore:
+class TripleStore(BaseTripleStore):
     """rdflib 기반 로컬 트리플 스토어."""
 
     def __init__(self, graph: Graph | None = None):

@@ -63,6 +63,8 @@
             <div class="nav-tab" data-tab="buildings">Buildings</div>
             <div class="nav-tab" data-tab="elements">Elements</div>
             <div class="nav-tab" data-tab="sparql">SPARQL</div>
+            <div class="nav-tab" data-tab="properties">Properties</div>
+            <div class="nav-tab" data-tab="ontology">Ontology</div>
             <div class="nav-tab" data-tab="reasoning">Reasoning</div>
         </nav>
 
@@ -203,6 +205,87 @@ ORDER BY DESC(?num)</textarea>
                     <div class="card col-span-1">
                         <div class="card-header">Query Templates</div>
                         <div class="card-body space-y-2" id="query-templates">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Properties Tab -->
+            <div id="tab-properties" class="tab-content" style="display:none">
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="card col-span-1">
+                        <div class="card-header">Property Lookup</div>
+                        <div class="card-body">
+                            <label class="text-xs text-gray-500 block mb-1">Element GlobalId</label>
+                            <div class="flex gap-2 mb-3">
+                                <input type="text" id="prop-global-id" placeholder="Enter GlobalId..." class="text-sm flex-1">
+                                <button class="btn btn-primary text-sm" onclick="lookupProperties()">Lookup</button>
+                            </div>
+                            <label class="text-xs text-gray-500 block mb-1">Property Search</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="prop-search-key" placeholder="Key (e.g. Weight)" class="text-sm flex-1">
+                                <button class="btn btn-secondary text-sm" onclick="searchProperties()">Search</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card col-span-2">
+                        <div class="card-header">Property Results</div>
+                        <div class="card-body" id="prop-results">
+                            <p class="text-gray-500 text-sm">Enter a GlobalId or search by property key.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mt-4">
+                    <div class="card-header">Smart3D Plant Data Summary</div>
+                    <div class="card-body" id="plant-data">
+                        <div class="loading"><div class="spinner"></div>Loading plant data...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ontology Editor Tab -->
+            <div id="tab-ontology" class="tab-content" style="display:none">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>Object Types (Classes)</span>
+                            <button class="btn btn-primary text-sm" onclick="showCreateTypeForm()">+ New Type</button>
+                        </div>
+                        <div class="card-body" style="max-height:400px;overflow:auto" id="ontology-types">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>Link Types (Relations)</span>
+                            <button class="btn btn-primary text-sm" onclick="showCreateLinkForm()">+ New Link</button>
+                        </div>
+                        <div class="card-body" style="max-height:400px;overflow:auto" id="ontology-links">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>Classification Rules</span>
+                            <button class="btn btn-primary text-sm" onclick="saveRules()">Save Rules</button>
+                        </div>
+                        <div class="card-body">
+                            <textarea id="rules-editor" class="w-full" style="font-family:monospace;font-size:12px;min-height:300px;resize:vertical"></textarea>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>Schema Import / Export</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary text-sm" onclick="exportSchema()">Export</button>
+                                <button class="btn btn-secondary text-sm" onclick="importSchemaPrompt()">Import</button>
+                                <button class="btn btn-primary text-sm" onclick="applySchema()">Apply to Graph</button>
+                            </div>
+                        </div>
+                        <div class="card-body" id="schema-status">
+                            <p class="text-gray-500 text-sm">Export/Import schema as JSON. Apply custom schema to the RDF graph.</p>
                         </div>
                     </div>
                 </div>

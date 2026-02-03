@@ -18,6 +18,7 @@ from src.converter.namespace_manager import BIM, INST, bind_namespaces
 from src.converter.streaming_converter import StreamingConverter
 from src.parser import IFCParser
 from src.storage import TripleStore
+from conftest import requires_ifc
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 
@@ -246,6 +247,7 @@ class TestOWLReasoner:
 
 # ---------- StreamingConverter 테스트 ----------
 
+@requires_ifc
 class TestStreamingConverter:
     @pytest.fixture(scope="class")
     def ifc4_parser(self):
@@ -308,6 +310,7 @@ class TestStreamingConverter:
 
 # ---------- 통합 테스트: 추론 + 캐시 ----------
 
+@requires_ifc
 class TestReasoningIntegration:
     @pytest.fixture(scope="class")
     def converted_store(self):

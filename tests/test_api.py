@@ -16,6 +16,7 @@ from src.parser import IFCParser
 from src.converter import RDFConverter
 from src.storage import TripleStore
 from src.api.server import create_app
+from conftest import requires_ifc
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 
@@ -39,6 +40,7 @@ def client(store):
 
 # ---------- Health ----------
 
+@requires_ifc
 class TestHealth:
     def test_root(self, client):
         r = client.get("/")
@@ -55,6 +57,7 @@ class TestHealth:
 
 # ---------- SPARQL ----------
 
+@requires_ifc
 class TestSPARQL:
     def test_sparql_select(self, client):
         r = client.post("/api/sparql", json={
@@ -92,6 +95,7 @@ class TestSPARQL:
 
 # ---------- Buildings ----------
 
+@requires_ifc
 class TestBuildings:
     def test_list_buildings(self, client):
         r = client.get("/api/buildings")
@@ -144,6 +148,7 @@ class TestBuildings:
 
 # ---------- Statistics ----------
 
+@requires_ifc
 class TestStatistics:
     def test_overall_statistics(self, client):
         r = client.get("/api/statistics")
@@ -173,6 +178,7 @@ class TestStatistics:
 
 # ---------- Query Templates ----------
 
+@requires_ifc
 class TestQueryTemplates:
     def test_component_statistics_query(self, client):
         from src.api.queries.templates import get_component_statistics
@@ -203,6 +209,7 @@ class TestQueryTemplates:
 
 # ---------- Reasoning ----------
 
+@requires_ifc
 class TestReasoning:
     def test_run_reasoning(self, client):
         r = client.post("/api/reasoning")

@@ -82,6 +82,32 @@ CUSTOM_RULES = {
             }
         """,
     },
+    "infer_plant_support_element": {
+        "description": "Hanger, Brace, MemberSystem, Support → PlantSupportElement 추론",
+        "construct": """
+            PREFIX bim: <http://example.org/bim-ontology/schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            CONSTRUCT { ?elem rdf:type bim:PlantSupportElement }
+            WHERE {
+                ?elem bim:hasCategory ?cat .
+                FILTER(?cat IN ("Hanger", "Brace", "MemberSystem", "Support"))
+            }
+        """,
+    },
+    "infer_piping_element": {
+        "description": "PipeFitting, Flange, Nozzle, Valve → PipingElement 추론",
+        "construct": """
+            PREFIX bim: <http://example.org/bim-ontology/schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            CONSTRUCT { ?elem rdf:type bim:PipingElement }
+            WHERE {
+                ?elem bim:hasCategory ?cat .
+                FILTER(?cat IN ("PipeFitting", "Flange", "Nozzle", "Valve", "Pipe"))
+            }
+        """,
+    },
 }
 
 
@@ -202,6 +228,16 @@ class OWLReasoner:
         g.add((BIM.AccessElement, RDF.type, OWL.Class))
         g.add((BIM.AccessElement, RDFS.subClassOf, BIM.PhysicalElement))
         g.add((BIM.AccessElement, RDFS.label, Literal("Access Element")))
+
+        # 플랜트 지지 요소 상위 클래스
+        g.add((BIM.PlantSupportElement, RDF.type, OWL.Class))
+        g.add((BIM.PlantSupportElement, RDFS.subClassOf, BIM.PhysicalElement))
+        g.add((BIM.PlantSupportElement, RDFS.label, Literal("Plant Support Element")))
+
+        # 배관 요소 상위 클래스
+        g.add((BIM.PipingElement, RDF.type, OWL.Class))
+        g.add((BIM.PipingElement, RDFS.subClassOf, BIM.PhysicalElement))
+        g.add((BIM.PipingElement, RDFS.label, Literal("Piping Element")))
 
         # 건물 포함 관계
         g.add((BIM.isInBuilding, RDF.type, OWL.ObjectProperty))
