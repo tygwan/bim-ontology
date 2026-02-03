@@ -16,7 +16,11 @@ from src.parser import IFCParser
 from src.converter import RDFConverter
 from src.storage import TripleStore
 from src.api.server import create_app
-from conftest import requires_ifc
+
+requires_ifc = pytest.mark.skipif(
+    not Path("references/nwd4op-12.ifc").exists(),
+    reason="IFC test data not available",
+)
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 

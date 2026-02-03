@@ -18,7 +18,11 @@ from src.converter.namespace_manager import BIM, INST, bind_namespaces
 from src.converter.streaming_converter import StreamingConverter
 from src.parser import IFCParser
 from src.storage import TripleStore
-from conftest import requires_ifc
+
+requires_ifc = pytest.mark.skipif(
+    not Path("references/nwd4op-12.ifc").exists(),
+    reason="IFC test data not available",
+)
 
 IFC4_FILE = "references/nwd4op-12.ifc"
 
