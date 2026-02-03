@@ -108,6 +108,6 @@ def analyze_properties(filepath: str, max_elements: int = 10):
 if __name__ == '__main__':
     # 작은 파일(IFC4)만 분석
     analyze_properties(
-        '/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc',
+        'references/nwd4op-12.ifc',
         max_elements=5
     )

@@ -145,7 +145,7 @@ curl -X POST http://localhost:8001/api/sparql \
 ```python
 from src.clients.python import BIMOntologyClient
 
-client = BIMOntologyClient.from_ifc("references/nwd4op-12.ifc")
+client = BIMOntologyClient.from_ifc("references/sample.ifc")
 
 # 기본 조회
 stats = client.get_statistics()

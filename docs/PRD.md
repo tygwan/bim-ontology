@@ -30,7 +30,7 @@ Building Information Modeling (BIM) 산업의 표준 데이터 포맷인 IFC (In
 - 다양한 프로그래밍 언어 (Python, Java, JavaScript)와의 통합 용이성
 
 **보유 자산**
-- IFC4 대용량 파일 2개 (224MB, 311MB)
+- IFC4/IFC2X3 대용량 파일 (references/ 디렉토리)
 - 참조 논문 2편 (ifcOWL 연구, BIM-AMS 통합)
 - IFC4 스키마 표준 문서
 
@@ -348,7 +348,7 @@ Building Information Modeling (BIM) 산업의 표준 데이터 포맷인 IFC (In
 
 ### 7.1 MVP (Minimum Viable Product) 기준
 
-- [ ] **SC-001**: 보유한 2개의 IFC 파일 (224MB, 311MB)을 성공적으로 변환
+- [ ] **SC-001**: 보유한 IFC4/IFC2X3 파일을 성공적으로 변환
 - [ ] **SC-002**: 변환된 데이터에 대해 최소 10개의 표준 SPARQL 쿼리 실행 가능
 - [ ] **SC-003**: Python 클라이언트 라이브러리로 쿼리 실행 가능
 - [ ] **SC-004**: 건물 구성요소 조회 쿼리 응답 시간 < 2초
@@ -489,11 +489,11 @@ Week: 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16
 
 ### 11.2 참조 논문
 
-1. **ifcOWL 연구**: `/home/coffin/dev/bim-ontology/references/★1-s2.0-S2667305324000425-main.pdf`
+1. **ifcOWL 연구** (references/ 디렉토리)
    - IFC EXPRESS를 OWL로 변환하는 방법론
    - 의미론적 쿼리 및 추론 사례
 
-2. **BIM-AMS 통합**: `/home/coffin/dev/bim-ontology/references/★1-s2.0-S1474034621002019-main.pdf`
+2. **BIM-AMS 통합** (references/ 디렉토리)
    - Ontology 기반 BIM과 Asset Management System 통합
    - 실제 건설 프로젝트 사례 연구
 
@@ -506,8 +506,7 @@ Week: 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16
 
 ### 11.4 IFC 샘플 파일
 
-- `nwd4op-12.ifc` (224 MB): `/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc`
-- `nwd23op-12.ifc` (311 MB): `/home/coffin/dev/bim-ontology/references/nwd23op-12.ifc`
+- IFC4/IFC2X3 샘플 파일: `references/*.ifc` (.gitignore)
 
 ---
 

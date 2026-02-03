@@ -10,7 +10,7 @@
 
 ## Completion Criteria
 
-- [x] 224MB IFC 파일 변환 < 30분 (실제 1.3초)
+- [x] 대용량 IFC 파일 변환 < 30분 (실제 ~1.3초)
 - [x] 쿼리 캐싱 적용 (인메모리 LRU, 14,869x 속도 향상)
 - [x] OWL/RDFS 추론 엔진 통합 (owlrl)
 - [x] 추론 규칙 5개 작성 + RDFS 추론
@@ -33,8 +33,8 @@
   - [x] 적중률/통계 추적
 
 ### 벤치마크 결과
-- [x] IFC4 (224MB): 로딩 13.1s, 변환 1.3s, 39,237 트리플
-- [x] IFC2X3 (828MB): 로딩 68.5s, 변환 38.1s, 39,196 트리플
+- [x] IFC4 샘플: 로딩 ~13s, 변환 ~1.3s, ~39K 트리플
+- [x] IFC2X3 샘플: 로딩 ~69s, 변환 ~38s, ~39K 트리플
 - [x] 캐시: Cold 65.6ms → Hot 0.004ms (14,869x 향상)
 - [x] 메모리 사용량 적정 (기하 형상 제외로 실제 부하 ~4K 엔티티)
 
@@ -48,7 +48,7 @@
   - [x] infer_access_element (Stair, Railing)
   - [x] infer_storey_has_elements
   - [x] infer_element_in_building (전이적 관계)
-- [x] 추론 결과: 39,237 → 65,407 트리플 (+26,157, +66.7%)
+- [x] 추론 결과: ~39K → ~65K 트리플 (+66.7%)
 
 ### 테스트
 - [x] `tests/test_phase4.py` - 29개 테스트

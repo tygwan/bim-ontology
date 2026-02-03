@@ -248,8 +248,8 @@ bim-ontology/
 
 | Metric | Value |
 |--------|-------|
-| IFC4 conversion | 1.3s / 39,237 triples |
-| IFC2X3 conversion (streaming) | 38.1s / 39,237 triples |
+| IFC4 conversion | ~1.3s / ~39K triples |
+| IFC2X3 conversion (streaming) | ~38s / ~39K triples |
 | SPARQL cache speedup | 14,869x (65ms -> 0.004ms) |
 | OWL reasoning triple increase | +66.7% (39K -> 65K) |
 | Test coverage | 85% (91 tests) |

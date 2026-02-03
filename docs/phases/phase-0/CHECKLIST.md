@@ -35,8 +35,8 @@
 - [x] import 테스트 성공 (ifcopenshell, rdflib, fastapi)
 
 ### IFC 파싱 검증
-- [x] nwd4op-12.ifc (224MB, IFC4) 로딩 성공 - 66,538 엔티티, 13초
-- [x] nwd23op-12.ifc (828MB, IFC2X3) 로딩 성공 - 16,945,319 엔티티, 71초
+- [x] IFC4 샘플 파일 로딩 성공 - 수만 엔티티, ~13초
+- [x] IFC2X3 샘플 파일 로딩 성공 - 수천만 엔티티, ~71초
 - [x] 엔티티 타입 분석 완료
 - [x] F-001 발견: IFC 스키마 버전 불일치 (IFC4 vs IFC2X3)
 - [x] F-002 발견: Navisworks 내보내기로 타입 손실 (모두 IfcBuildingElementProxy)

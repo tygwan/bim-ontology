@@ -68,8 +68,7 @@ bim-ontology/
 │   └── cli/                   # CLI 도구
 ├── tests/                     # 테스트 코드
 ├── references/                # 참조 문서 및 샘플 파일
-│   ├── nwd4op-12.ifc          # IFC 샘플 (224MB)
-│   ├── nwd23op-12.ifc         # IFC 샘플 (311MB)
+│   ├── *.ifc                  # IFC 샘플 파일 (.gitignore)
 │   └── *.pdf                  # 연구 논문
 ├── scripts/                   # 유틸리티 스크립트
 ├── docker/                    # Docker 설정
@@ -112,7 +111,7 @@ docker-compose up -d graphdb
 ### Basic Usage (향후 구현)
 ```bash
 # IFC 파일 변환
-python cli.py convert --input references/nwd4op-12.ifc --output data/output.ttl
+python cli.py convert --input references/sample.ifc --output data/output.ttl
 
 # SPARQL 쿼리 실행
 python cli.py query --sparql "SELECT ?wall WHERE { ?wall a ifc:IfcWall }"
@@ -171,7 +170,7 @@ python api/server.py --port 8000
 ### Data Flow
 
 ```
-IFC File (224MB+)
+IFC File
     ↓
 [IFC Parser] → ifcopenshell 파싱
     ↓
@@ -218,16 +217,16 @@ IFC File (224MB+)
 ### Essential Files for Context Loading
 
 **최우선 로딩 파일 (P0)**:
-- `/home/coffin/dev/bim-ontology/docs/PRD.md` (요구사항 전체)
-- `/home/coffin/dev/bim-ontology/docs/CONTEXT.md` (이 문서)
-- `/home/coffin/dev/bim-ontology/docs/PROGRESS.md` (현재 진행 상황)
+- `docs/PRD.md` (요구사항 전체)
+- `docs/CONTEXT.md` (이 문서)
+- `docs/PROGRESS.md` (현재 진행 상황)
 
 **현재 Phase 관련 파일 (P1)**:
-- `/home/coffin/dev/bim-ontology/docs/phases/phase-0/SPEC.md`
-- `/home/coffin/dev/bim-ontology/docs/phases/phase-0/TASKS.md`
+- `docs/phases/phase-0/SPEC.md`
+- `docs/phases/phase-0/TASKS.md`
 
 **기술 참조 파일 (P2)**:
-- `/home/coffin/dev/bim-ontology/docs/TECH-SPEC.md` (상세 기술 명세)
+- `docs/TECH-SPEC.md` (상세 기술 명세)
 
 **선택적 로딩**:
 - 다른 Phase 문서 (작업 시작 시에만)
@@ -236,8 +235,8 @@ IFC File (224MB+)
 ### Excludable Paths for Token Savings
 
 **제외 가능 (대용량 파일)**:
-- `/home/coffin/dev/bim-ontology/references/*.ifc` (224MB, 311MB - 필요 시에만)
-- `/home/coffin/dev/bim-ontology/references/*.pdf` (연구 논문 - 요약본만 참조)
+- `references/*.ifc` (대용량 IFC 파일 - 필요 시에만)
+- `references/*.pdf` (연구 논문 - 요약본만 참조)
 
 **제외 가능 (시스템 파일)**:
 - `.git/`, `__pycache__/`, `node_modules/`, `venv/`
@@ -269,18 +268,18 @@ IFC File (224MB+)
 
 | 문서 | 설명 | 경로 |
 |------|------|------|
-| PRD | 제품 요구사항 정의서 | `/home/coffin/dev/bim-ontology/docs/PRD.md` |
-| TECH-SPEC | 기술 명세서 | `/home/coffin/dev/bim-ontology/docs/TECH-SPEC.md` |
-| PROGRESS | 진행 상황 추적 | `/home/coffin/dev/bim-ontology/docs/PROGRESS.md` |
-| Phase 0 | 프로젝트 초기화 | `/home/coffin/dev/bim-ontology/docs/phases/phase-0/` |
-| README | 프로젝트 개요 | `/home/coffin/dev/bim-ontology/README.md` |
+| PRD | 제품 요구사항 정의서 | `docs/PRD.md` |
+| TECH-SPEC | 기술 명세서 | `docs/TECH-SPEC.md` |
+| PROGRESS | 진행 상황 추적 | `docs/PROGRESS.md` |
+| Phase 0 | 프로젝트 초기화 | `docs/phases/phase-0/` |
+| README | 프로젝트 개요 | `README.md` |
 
 ---
 
 ## Key Metrics
 
 **프로젝트 범위**:
-- IFC 파일 크기: 224MB, 311MB
+- IFC 파일: 대용량 IFC4/IFC2X3 파일 지원
 - 예상 RDF triple 수: 100만~500만
 - 지원 클라이언트: Python, Java, JavaScript
 - 개발 기간: 3개월 (MVP)
@@ -311,8 +310,8 @@ IFC File (224MB+)
 - Apache Jena: https://jena.apache.org/documentation/
 
 **Sample Data**:
-- IFC Files: `/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc`, `nwd23op-12.ifc`
-- Research Papers: `/home/coffin/dev/bim-ontology/references/*.pdf`
+- IFC Files: `references/*.ifc` (IFC4/IFC2X3 샘플 - .gitignore)
+- Research Papers: `references/*.pdf`
 
 ---
 

@@ -230,7 +230,7 @@ def ifc_to_rdf(ifc_path: str, output_path: str = None) -> Graph:
 
     # RDF 파일 저장
     if output_path is None:
-        output_path = f"/home/coffin/dev/bim-ontology/data/rdf/{path.stem}.ttl"
+        output_path = f"data/rdf/{path.stem}.ttl"
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -372,5 +372,5 @@ def run_sparql_tests(g: Graph):
 
 if __name__ == "__main__":
     # IFC4 파일로 테스트 (작은 파일)
-    g = ifc_to_rdf("/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc")
+    g = ifc_to_rdf("references/nwd4op-12.ifc")
     run_sparql_tests(g)

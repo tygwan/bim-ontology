@@ -198,7 +198,7 @@
     import ifcopenshell
 
     # Test 1: Load small IFC file
-    ifc_file = ifcopenshell.open('references/nwd4op-12.ifc')
+    ifc_file = ifcopenshell.open('references/sample.ifc')
     print(f"Schema: {ifc_file.schema}")
     print(f"Total Entities: {len(ifc_file)}")
 
@@ -210,7 +210,7 @@
     print(f"Total Columns: {len(columns)}")
     ```
   - Success Criteria:
-    - nwd4op-12.ifc (224MB) 로딩 성공
+    - IFC4 샘플 파일 로딩 성공
     - 엔티티 추출 성공
     - 메모리 사용량 < 4GB
 
@@ -409,7 +409,7 @@ graph TD
 
 - 문서화 작업은 dev-docs-writer agent가 자동으로 수행
 - 환경 설정 작업은 개발자가 수동으로 수행 필요
-- IFC 샘플 파일 경로 확인 필요: `/home/coffin/dev/bim-ontology/references/`
+- IFC 샘플 파일은 `references/` 디렉토리에 배치 (.gitignore)
 - Triple Store는 GraphDB 권장 (SPARQL 1.1 완전 지원)
 
 ---

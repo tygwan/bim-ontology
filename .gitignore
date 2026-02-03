@@ -47,5 +47,8 @@ htmlcov/
 .claude/session.log
 .claude/changes.log
 
+# Generated reports
+VALIDATION-REPORT.md
+
 # Node (if any)
 node_modules/

@@ -68,7 +68,7 @@ All core modules implemented and tested:
 - ✅ `pyproject.toml` - Marker registration
 - ✅ All 4 test files marked with `@requires_ifc` for IFC-dependent tests
 - ✅ `.github/workflows/ci.yml` - `-m "not requires_ifc"`, threshold 60%
-- CI can now run without 224MB IFC file
+- CI can now run without IFC test data file
 
 ## Phase 9: Smart3D Plant Classification (M10)
 

@@ -3,7 +3,7 @@
 ## 1. 직접 실행 (개발용)
 
 ```bash
-cd /home/coffin/dev/bim-ontology
+cd bim-ontology
 source venv/bin/activate
 uvicorn src.api.server:app --host 0.0.0.0 --port 8001
 ```
@@ -20,7 +20,7 @@ uvicorn src.api.server:app --host 0.0.0.0 --port 8001
 ### 빌드 및 실행
 
 ```bash
-cd /home/coffin/dev/bim-ontology
+cd bim-ontology
 
 # 기본 포트 (8000)
 docker compose up --build -d
@@ -59,8 +59,8 @@ docker compose down
 
 `references/` 디렉토리에 IFC 파일을 배치합니다.
 
-- 기본 파일: `references/nwd4op-12.ifc` (IFC4, 224MB)
-- 보조 파일: `references/nwd23op-12.ifc` (IFC2X3, 828MB)
+- IFC4 샘플 파일을 `references/` 디렉토리에 배치합니다.
+- IFC2X3 파일도 지원됩니다.
 
 ### RDF 캐시
 
@@ -68,7 +68,7 @@ docker compose down
 이후 재시작에서는 캐시 파일을 직접 로딩합니다.
 
 ```
-data/rdf/nwd4op-12.ttl    # IFC4 변환 캐시 (~2MB)
+data/rdf/<filename>.ttl    # IFC 변환 캐시 (Turtle 포맷)
 ```
 
 캐시를 갱신하려면 해당 `.ttl` 파일을 삭제 후 서버를 재시작합니다.
@@ -82,8 +82,8 @@ data/rdf/nwd4op-12.ttl    # IFC4 변환 캐시 (~2MB)
 `src/api/server.py`에서 기본 경로를 수정:
 
 ```python
-DEFAULT_IFC_PATH = "references/nwd4op-12.ifc"
-DEFAULT_RDF_PATH = "data/rdf/nwd4op-12.ttl"
+DEFAULT_IFC_PATH = "references/<your-file>.ifc"
+DEFAULT_RDF_PATH = "data/rdf/<your-file>.ttl"
 ```
 
 ### CORS 설정

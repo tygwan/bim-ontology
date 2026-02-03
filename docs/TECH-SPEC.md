@@ -39,15 +39,13 @@ This technical specification document defines the architecture, design, and impl
 
 ### 1.3 References
 
-- **PRD**: `/home/coffin/dev/bim-ontology/docs/PRD.md`
+- **PRD**: `docs/PRD.md`
 - **IFC4 Standard**: https://standards.buildingsmart.org/IFC/RELEASE/IFC4/FINAL/HTML/
 - **ifcOWL Specification**: https://www.w3.org/community/lbd/
 - **Research Papers**:
-  - `/home/coffin/dev/bim-ontology/references/★1-s2.0-S2667305324000425-main.pdf` (ifcOWL research)
-  - `/home/coffin/dev/bim-ontology/references/★1-s2.0-S1474034621002019-main.pdf` (BIM-AMS integration)
-- **Sample IFC Files**:
-  - `/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc` (224MB)
-  - `/home/coffin/dev/bim-ontology/references/nwd23op-12.ifc` (311MB)
+  - ifcOWL 연구 논문 (references/ 디렉토리)
+  - BIM-AMS 통합 논문 (references/ 디렉토리)
+- **Sample IFC Files**: `references/*.ifc` (IFC4/IFC2X3 샘플 - .gitignore)
 
 ---
 
@@ -2823,6 +2821,6 @@ strategy:
 **Document Status**: Draft
 **Next Steps**: Review with team, begin Phase 1 implementation
 **Related Documents**:
-- PRD: `/home/coffin/dev/bim-ontology/docs/PRD.md`
+- PRD: `docs/PRD.md`
 - API Documentation: `docs/api/openapi.yaml` (to be created)
 - User Guide: `docs/user-guide.md` (to be created)

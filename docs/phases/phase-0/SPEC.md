@@ -146,8 +146,7 @@ bim-ontology/
 │   └── cli/                       ❌ 미생성
 ├── tests/                         # 테스트 코드
 ├── references/                    # 참조 문서 및 샘플
-│   ├── nwd4op-12.ifc              ✅ 존재 (224MB)
-│   ├── nwd23op-12.ifc             ✅ 존재 (311MB)
+│   ├── *.ifc                      ✅ 존재 (IFC 샘플, .gitignore)
 │   └── *.pdf                      ✅ 존재 (연구 논문)
 ├── scripts/                       # 유틸리티 스크립트
 ├── docker/                        # Docker 설정
@@ -222,7 +221,7 @@ pip install pytest>=7.0.0
 import ifcopenshell
 
 # IFC 파일 로딩
-ifc_file = ifcopenshell.open('/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc')
+ifc_file = ifcopenshell.open('references/sample.ifc')
 
 # 기본 정보 출력
 print(f"IFC Schema: {ifc_file.schema}")
@@ -234,8 +233,8 @@ print(f"Total Walls: {len(walls)}")
 ```
 
 **Acceptance Criteria**:
-- [ ] nwd4op-12.ifc (224MB) 로딩 성공
-- [ ] nwd23op-12.ifc (311MB) 로딩 성공
+- [ ] IFC4 샘플 파일 로딩 성공
+- [ ] IFC2X3 샘플 파일 로딩 성공
 - [ ] IfcWall, IfcColumn 등 엔티티 추출 성공
 - [ ] 메모리 사용량 모니터링 (< 4GB)
 
@@ -329,7 +328,7 @@ docker run -d -p 7474:7474 -p 7687:7687 \
 
 ### R-P0-002: 대용량 IFC 파일 메모리 부족
 
-**Risk**: 311MB IFC 파일 로딩 시 메모리 부족 발생 가능
+**Risk**: 대용량 IFC 파일 로딩 시 메모리 부족 발생 가능
 **Probability**: 낮음
 **Impact**: 중간
 **Mitigation**:
@@ -417,7 +416,7 @@ docker run -d -p 7474:7474 -p 7687:7687 \
 ## Notes
 
 - Phase 0는 순수 설정 및 문서화 작업으로, 코딩은 Phase 1부터 시작
-- IFC 샘플 파일은 이미 `/home/coffin/dev/bim-ontology/references/`에 존재
+- IFC 샘플 파일은 `references/` 디렉토리에 배치 (.gitignore)
 - GraphDB vs Neo4j 선택은 Phase 0 완료 전에 결정 (GraphDB 권장)
 - 문서화 작업은 dev-docs-writer agent가 담당
 

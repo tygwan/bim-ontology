@@ -30,12 +30,12 @@ IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고,
 - **Docker**: 단일 컨테이너 배포 (python:3.12-slim)
 - **CI**: GitHub Actions 자동 테스트
 
-## Test Data
+## Tested Configurations
 
-| File | Schema | Size | Entities | Triples | Conversion Time |
-|------|--------|------|----------|---------|-----------------|
-| nwd4op-12.ifc | IFC4 | 224MB | 66,538 | 39,237 | 1.3s |
-| nwd23op-12.ifc | IFC2X3 | 828MB | 16,945,319 | 39,196 | 38.1s |
+| Schema | Entities Scale | Triples | Conversion Time |
+|--------|---------------|---------|-----------------|
+| IFC4 | 수만 | ~39K | ~1.3s |
+| IFC2X3 | 수천만 | ~39K | ~38s |
 
 ## Quality
 

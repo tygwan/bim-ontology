@@ -29,7 +29,7 @@ IFC4 파일을 파싱하고 ifcOWL 기반 RDF triple로 변환하는 핵심 기�
 
 ### Success Criteria
 
-- [ ] 224MB IFC 파일 (nwd4op-12.ifc) 파싱 성공
+- [ ] IFC4 샘플 파일 파싱 성공
 - [ ] 최소 1,000개 이상 RDF triple 생성
 - [ ] Triple Store에 저장 및 조회 성공
 - [ ] 단위 테스트 커버리지 > 70%
@@ -57,7 +57,7 @@ IFC4 파일을 파싱하고 ifcOWL 기반 RDF triple로 변환하는 핵심 기�
 **Acceptance Criteria**:
 ```python
 # Test case
-ifc_file = IFCParser.open('references/nwd4op-12.ifc')
+ifc_file = IFCParser.open('references/sample.ifc')
 assert ifc_file.schema == 'IFC4'
 assert len(ifc_file.get_entities('IfcWall')) > 0
 assert len(ifc_file.get_entities('IfcSpace')) > 0
@@ -142,7 +142,7 @@ src/
 ### Data Flow
 
 ```
-IFC File (224MB)
+IFC File
     ↓
 [IFC Parser] → ifcopenshell.open()
     ↓
@@ -233,7 +233,7 @@ class IFCParser:
 
 **Usage Example**:
 ```python
-parser = IFCParser('/home/coffin/dev/bim-ontology/references/nwd4op-12.ifc')
+parser = IFCParser('references/sample.ifc')
 ifc_file = parser.open()
 
 walls = parser.get_entities('IfcWall')
@@ -334,13 +334,13 @@ print(f"Total IfcWall triples: {result['count']}")
 ```python
 # tests/test_ifc_parser.py
 def test_open_ifc_file():
-    parser = IFCParser('references/nwd4op-12.ifc')
+    parser = IFCParser('references/sample.ifc')
     ifc_file = parser.open()
     assert ifc_file is not None
     assert parser.get_schema() == 'IFC4'
 
 def test_extract_walls():
-    parser = IFCParser('references/nwd4op-12.ifc')
+    parser = IFCParser('references/sample.ifc')
     parser.open()
     walls = parser.get_entities('IfcWall')
     assert len(walls) > 0
@@ -373,7 +373,7 @@ def test_namespace_mapping():
 ```python
 def test_end_to_end_conversion():
     # 1. Parse IFC
-    parser = IFCParser('references/nwd4op-12.ifc')
+    parser = IFCParser('references/sample.ifc')
     ifc_file = parser.open()
 
     # 2. Convert to RDF
@@ -408,7 +408,7 @@ def test_end_to_end_conversion():
 
 ### Data Dependencies
 
-- IFC4 샘플 파일: `references/nwd4op-12.ifc`, `references/nwd23op-12.ifc`
+- IFC 샘플 파일: `references/*.ifc` (.gitignore)
 - ifcOWL 온톨로지: https://www.w3.org/community/lbd/
 
 ---

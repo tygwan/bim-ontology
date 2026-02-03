@@ -109,7 +109,7 @@ def analyze_ifc(filepath: str) -> dict:
 
 
 if __name__ == '__main__':
-    ifc_dir = Path('/home/coffin/dev/bim-ontology/references')
+    ifc_dir = Path('references')
     ifc_files = sorted(ifc_dir.glob('*.ifc'))
 
     if not ifc_files:
