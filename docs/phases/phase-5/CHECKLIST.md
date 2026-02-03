@@ -33,7 +33,7 @@
 ### Docker 배포
 - [x] Dockerfile (Python 3.12-slim)
 - [x] docker-compose.yml (단일 서비스)
-- [ ] Docker 실행 검증 (WSL에서 Docker 미설치)
+- [x] Docker 실행 검증 (Docker 29.0.1 + Compose v2.40.3)
 
 ### CLI 도구 (보류)
 - [ ] convert 명령어
