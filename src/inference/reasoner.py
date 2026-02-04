@@ -10,7 +10,7 @@ import time
 from rdflib import Graph, Literal, RDF, RDFS, OWL, XSD, URIRef
 import owlrl
 
-from ..converter.namespace_manager import BIM, INST
+from ..converter.namespace_manager import BIM, INST, SCHED, AWP
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,55 @@ CUSTOM_RULES = {
             WHERE {
                 ?elem bim:hasCategory ?cat .
                 FILTER(?cat IN ("PipeFitting", "Flange", "Nozzle", "Valve", "Pipe"))
+            }
+        """,
+    },
+    # ===== Lean Layer Reasoning Rules =====
+    "infer_delayed_element": {
+        "description": "설치 예정일이 지났지만 Installed가 아닌 부재 → isDelayed true 추론",
+        "construct": """
+            PREFIX bim: <http://example.org/bim-ontology/schema#>
+            PREFIX sched: <http://example.org/bim-ontology/schedule#>
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+            CONSTRUCT { ?elem bim:isDelayed "true"^^xsd:boolean }
+            WHERE {
+                ?elem sched:hasPlannedInstallDate ?plannedDate .
+                ?elem bim:hasDeliveryStatus ?status .
+                FILTER(?status NOT IN ("Installed", "Inspected"))
+                FILTER(?plannedDate < NOW())
+            }
+        """,
+    },
+    "infer_iwp_executable": {
+        "description": "IWP의 제약이 AllCleared이고 모든 요소가 OnSite/Installed → isExecutable true",
+        "construct": """
+            PREFIX awp: <http://example.org/bim-ontology/awp#>
+            PREFIX bim: <http://example.org/bim-ontology/schema#>
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+            CONSTRUCT { ?iwp awp:isExecutable "true"^^xsd:boolean }
+            WHERE {
+                ?iwp a awp:InstallationWorkPackage .
+                ?iwp awp:hasConstraintStatus "AllCleared" .
+                FILTER NOT EXISTS {
+                    ?iwp awp:includesElement ?elem .
+                    ?elem bim:hasDeliveryStatus ?status .
+                    FILTER(?status NOT IN ("OnSite", "Installed", "Inspected"))
+                }
+            }
+        """,
+    },
+    "infer_element_ready": {
+        "description": "OnSite 또는 Installed 상태인 요소 → isReady true 추론",
+        "construct": """
+            PREFIX bim: <http://example.org/bim-ontology/schema#>
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+            CONSTRUCT { ?elem bim:isReady "true"^^xsd:boolean }
+            WHERE {
+                ?elem bim:hasDeliveryStatus ?status .
+                FILTER(?status IN ("OnSite", "Installed", "Inspected"))
             }
         """,
     },

@@ -41,6 +41,26 @@
         .hierarchy-node { margin-left: 0; }
         .hierarchy-node .children { margin-left: 24px; border-left: 1px solid #334155; padding-left: 12px; }
         .node-icon { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .badge-red { background: #450a0a; color: #f87171; }
+        .check-card { transition: all 0.2s; }
+        .check-card.hidden { display: none; }
+        .check-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .check-detail.open { max-height: 400px; }
+        .progress-bar { height: 6px; border-radius: 3px; background: #334155; }
+        .progress-fill { height: 100%; border-radius: 3px; }
+        .filter-check { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; background: #334155; cursor: pointer; font-size: 12px; }
+        .filter-check input { accent-color: #3b82f6; }
+        /* Explorer Tab */
+        .type-radio { padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .type-radio:hover { background: #334155; }
+        .type-radio.selected { background: #1e3a5f; color: #60a5fa; }
+        .col-check { font-size: 12px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px; }
+        .col-check input { accent-color: #3b82f6; }
+        .node-detail { background: #0f172a; border: 1px solid #334155; border-radius: 8px; margin-top: 16px; }
+        .node-detail-header { padding: 12px 16px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+        .node-detail-body { padding: 16px; max-height: 300px; overflow: auto; }
+        #exp-types { max-height: 600px; overflow-y: auto; }
+        #exp-columns { display: flex; flex-wrap: wrap; gap: 4px; }
     </style>
 </head>
 <body>
@@ -66,6 +86,11 @@
             <div class="nav-tab" data-tab="properties">Properties</div>
             <div class="nav-tab" data-tab="ontology">Ontology</div>
             <div class="nav-tab" data-tab="reasoning">Reasoning</div>
+            <div class="nav-tab" data-tab="validation">Validation</div>
+            <div class="nav-tab" data-tab="explorer">Explorer</div>
+            <div class="nav-tab" data-tab="lean">Lean Layer</div>
+            <div class="nav-tab" data-tab="todayswork">Today's Work</div>
+            <div class="nav-tab" data-tab="statusmon">Status Monitor</div>
         </nav>
 
         <!-- Content -->
@@ -287,6 +312,278 @@ ORDER BY DESC(?num)</textarea>
                         <div class="card-body" id="schema-status">
                             <p class="text-gray-500 text-sm">Export/Import schema as JSON. Apply custom schema to the RDF graph.</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Tab -->
+            <div id="tab-validation" class="tab-content" style="display:none">
+                <!-- Controls -->
+                <div class="card mb-4">
+                    <div class="card-body flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-gray-500">TTL File:</label>
+                            <select id="val-ttl-select" class="text-sm" style="min-width:200px">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary text-sm" id="btn-run-validation" onclick="runValidation()">Run Validation</button>
+                        <span class="text-xs text-gray-500" id="val-time"></span>
+                    </div>
+                    <div class="card-body border-t border-gray-700 flex flex-wrap gap-3" id="val-filters"></div>
+                </div>
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-4 gap-4 mb-4" id="val-summary" style="display:none">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="val-total-triples">--</div>
+                            <div class="stat-label">Total Triples</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="val-pass" style="color:#4ade80">--</div>
+                            <div class="stat-label">PASS</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="val-warn" style="color:#fbbf24">--</div>
+                            <div class="stat-label">WARN</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="val-fail" style="color:#f87171">--</div>
+                            <div class="stat-label">FAIL</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Check Cards Grid -->
+                <div class="grid grid-cols-2 gap-4" id="val-checks">
+                    <div class="loading" id="val-placeholder"><p class="text-gray-500 text-sm">Select a TTL file and click "Run Validation" to start.</p></div>
+                </div>
+                <!-- Other Category Explorer -->
+                <div class="card mt-4" id="val-other-explorer" style="display:none">
+                    <div class="card-header flex items-center justify-between">
+                        <span>Other Category Explorer <span class="text-xs text-gray-500">(IfcBuildingElementProxy)</span></span>
+                        <div class="flex gap-2">
+                            <input type="text" id="other-name-filter" placeholder="Filter by name..." class="text-sm" style="width:200px">
+                            <button class="btn btn-secondary text-sm" onclick="loadOtherElements()">Filter</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="grid grid-cols-3 gap-3 mb-4" id="other-groups"></div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Original Type</th>
+                                    <th>Storey</th>
+                                    <th>GlobalId</th>
+                                    <th>Suggested</th>
+                                </tr>
+                            </thead>
+                            <tbody id="other-elements-table">
+                                <tr><td colspan="5" class="text-center text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-gray-500" id="other-info">--</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary text-sm" onclick="otherPrevPage()">Prev</button>
+                                <button class="btn btn-secondary text-sm" onclick="otherNextPage()">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Explorer Tab -->
+            <div id="tab-explorer" class="tab-content" style="display:none">
+                <!-- Controls -->
+                <div class="card mb-4">
+                    <div class="card-body flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-gray-500">TTL File:</label>
+                            <select id="exp-ttl-select" class="text-sm" style="min-width:200px">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary text-sm" onclick="refreshExplorer()">Refresh</button>
+                    </div>
+                </div>
+                <!-- Main Layout -->
+                <div class="grid gap-4" style="grid-template-columns: 280px 1fr;">
+                    <!-- Left: Type List -->
+                    <div class="card">
+                        <div class="card-header">Node Types</div>
+                        <div class="card-body" id="exp-types">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <!-- Right: Columns + Table + Detail -->
+                    <div>
+                        <!-- Column Selector -->
+                        <div class="card mb-4">
+                            <div class="card-header">Columns (Predicates)</div>
+                            <div class="card-body">
+                                <div id="exp-columns">
+                                    <span class="text-gray-500 text-xs">Loading predicates...</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-3">
+                                    <input type="text" id="exp-search" placeholder="Search subjects or names..." class="text-sm flex-1">
+                                    <button class="btn btn-primary text-sm" onclick="loadNodes()">Load</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Results Table -->
+                        <div class="card">
+                            <div class="card-header flex items-center justify-between">
+                                <span>Nodes</span>
+                                <span class="text-xs text-gray-500" id="exp-info">--</span>
+                            </div>
+                            <div class="card-body" style="overflow-x:auto">
+                                <table>
+                                    <thead id="exp-thead"><tr><th>subject</th></tr></thead>
+                                    <tbody id="exp-tbody">
+                                        <tr><td class="text-gray-500">Select a type and columns, then click Load.</td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="flex items-center justify-between mt-4">
+                                    <div class="flex gap-2">
+                                        <button class="btn btn-secondary text-sm" onclick="expPrevPage()">Prev</button>
+                                        <button class="btn btn-secondary text-sm" onclick="expNextPage()">Next</button>
+                                    </div>
+                                    <span class="text-xs text-gray-500" id="exp-page-info"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Node Detail -->
+                        <div id="exp-detail" class="node-detail" style="display:none">
+                            <div class="node-detail-header" onclick="toggleExpDetail()">
+                                <span class="text-sm font-semibold" id="exp-detail-title">Node Detail</span>
+                                <span class="text-xs text-gray-500">click to toggle</span>
+                            </div>
+                            <div class="node-detail-body" id="exp-detail-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lean Layer Tab -->
+            <div id="tab-lean" class="tab-content" style="display:none">
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-blue-400" id="lean-tasks">--</div><div class="stat-label">Tasks</div></div></div>
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-green-400" id="lean-iwps">--</div><div class="stat-label">IWPs</div></div></div>
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-yellow-400" id="lean-statuses">--</div><div class="stat-label">Statuses</div></div></div>
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-purple-400" id="lean-equipment">--</div><div class="stat-label">Equipment</div></div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="card">
+                        <div class="card-header">CSV Data Injection</div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <label class="text-xs text-gray-500 block mb-1">Injection Type</label>
+                                <select id="lean-inject-type" class="w-full text-sm">
+                                    <option value="schedule">Schedule (Task/Date/Status/Cost)</option>
+                                    <option value="awp">AWP (CWA/CWP/IWP)</option>
+                                    <option value="status">Status (StatusValue/Date)</option>
+                                    <option value="equipment">Equipment (Dimensions/Capacity)</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="text-xs text-gray-500 block mb-1">CSV File</label>
+                                <input type="file" id="lean-csv-file" accept=".csv" class="text-sm w-full">
+                            </div>
+                            <button class="btn btn-primary w-full" onclick="injectLeanCSV()">Inject CSV</button>
+                            <div id="lean-inject-result" class="mt-3 text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Lean Layer Summary</div>
+                        <div class="card-body" id="lean-summary">
+                            <p class="text-gray-500 text-sm">Load Lean Layer stats to see summary.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Today's Work Tab -->
+            <div id="tab-todayswork" class="tab-content" style="display:none">
+                <div class="card mb-4">
+                    <div class="card-body flex items-center gap-4">
+                        <label class="text-xs text-gray-500">Target Date:</label>
+                        <input type="date" id="tw-date" class="text-sm">
+                        <button class="btn btn-primary text-sm" onclick="loadTodaysWork()">Load</button>
+                        <span class="text-xs text-gray-500" id="tw-info"></span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-4" id="tw-summary" style="display:none">
+                    <div class="card"><div class="card-body text-center"><div class="stat-value" id="tw-iwp-count">--</div><div class="stat-label">Active IWPs</div></div></div>
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-green-400" id="tw-elem-count">--</div><div class="stat-label">Total Elements</div></div></div>
+                    <div class="card"><div class="card-body text-center"><div class="stat-value text-blue-400" id="tw-exec-count">--</div><div class="stat-label">Executable</div></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Work Packages for Today</div>
+                    <div class="card-body" id="tw-table">
+                        <p class="text-gray-500 text-sm">Select a date and click Load.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Monitor Tab -->
+            <div id="tab-statusmon" class="tab-content" style="display:none">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>Delayed Elements</span>
+                            <div class="flex gap-2">
+                                <input type="date" id="sm-ref-date" class="text-sm">
+                                <button class="btn btn-primary text-sm" onclick="loadDelayed()">Check</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3"><div class="stat-value text-red-400" id="sm-delayed-count">--</div><div class="stat-label">Delayed</div></div>
+                            <div id="sm-delayed-list" style="max-height:300px;overflow:auto"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Delivery Status Distribution</div>
+                        <div class="card-body">
+                            <canvas id="chart-delivery-status" height="250"></canvas>
+                            <div id="sm-status-table" class="mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header flex items-center justify-between">
+                        <span>Element Status Update</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="flex gap-3 items-end">
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">GlobalId</label>
+                                <input type="text" id="sm-update-gid" placeholder="Enter GlobalId..." class="text-sm" style="width:280px">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">Status Value</label>
+                                <select id="sm-update-status" class="text-sm">
+                                    <option>Planned</option><option>Designed</option><option>Fabricated</option>
+                                    <option>Shipped</option><option>OnSite</option><option>Installed</option><option>Inspected</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">Delivery Status</label>
+                                <select id="sm-update-delivery" class="text-sm">
+                                    <option value="">--</option>
+                                    <option>Ordered</option><option>InProduction</option><option>Shipped</option>
+                                    <option>OnSite</option><option>Installed</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary text-sm" onclick="updateElementStatus()">Update</button>
+                        </div>
+                        <div id="sm-update-result" class="mt-3 text-sm"></div>
                     </div>
                 </div>
             </div>

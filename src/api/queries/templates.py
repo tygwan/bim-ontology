@@ -12,6 +12,8 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX bim: <http://example.org/bim-ontology/schema#>
 PREFIX inst: <http://example.org/bim-ontology/instance#>
+PREFIX sched: <http://example.org/bim-ontology/schedule#>
+PREFIX awp: <http://example.org/bim-ontology/awp#>
 """
 
 
@@ -174,6 +176,135 @@ WHERE {{
 """
 
 
+# ===== Lean Layer SPARQL Templates =====
+
+
+def get_delayed_elements(reference_date: str | None = None) -> str:
+    """지연 부재를 조회한다 (Semantic EPC - Concept 1)."""
+    date_filter = ""
+    if reference_date:
+        date_filter = f'FILTER(?plannedDate < "{reference_date}"^^xsd:date)'
+    return f"""{PREFIXES}
+SELECT ?elem ?name ?category ?plannedDate ?deliveryStatus ?isDelayed
+WHERE {{
+    ?elem a bim:PhysicalElement .
+    ?elem sched:hasPlannedInstallDate ?plannedDate .
+    OPTIONAL {{ ?elem bim:hasName ?name }}
+    OPTIONAL {{ ?elem bim:hasCategory ?category }}
+    OPTIONAL {{ ?elem bim:hasDeliveryStatus ?deliveryStatus }}
+    OPTIONAL {{ ?elem bim:isDelayed ?isDelayed }}
+    FILTER(?deliveryStatus NOT IN ("Installed", "Inspected"))
+    {date_filter}
+}}
+ORDER BY ?plannedDate
+"""
+
+
+def get_not_ready_elements() -> str:
+    """설치 준비 미완료 부재를 조회한다 (Semantic EPC)."""
+    return f"""{PREFIXES}
+SELECT ?elem ?name ?category ?deliveryStatus ?isReady
+WHERE {{
+    ?elem a bim:PhysicalElement .
+    ?elem bim:hasDeliveryStatus ?deliveryStatus .
+    OPTIONAL {{ ?elem bim:hasName ?name }}
+    OPTIONAL {{ ?elem bim:hasCategory ?category }}
+    OPTIONAL {{ ?elem bim:isReady ?isReady }}
+    FILTER(?deliveryStatus NOT IN ("OnSite", "Installed", "Inspected"))
+}}
+ORDER BY ?deliveryStatus ?name
+"""
+
+
+def get_equipment_access_zones() -> str:
+    """장비 진입 가능 구역을 조회한다 (시공성 검증 - Concept 2)."""
+    return f"""{PREFIXES}
+SELECT ?equip ?equipName ?width ?height ?turningRadius ?boomLength ?loadCapacity
+       ?cwa ?cwaName ?minSpacing ?floorHeight
+WHERE {{
+    ?equip a bim:ConstructionEquipment .
+    ?equip bim:canAccessZone ?cwa .
+    OPTIONAL {{ ?equip bim:hasName ?equipName }}
+    OPTIONAL {{ ?equip bim:hasEquipmentWidth ?width }}
+    OPTIONAL {{ ?equip bim:hasEquipmentHeight ?height }}
+    OPTIONAL {{ ?equip bim:hasTurningRadius ?turningRadius }}
+    OPTIONAL {{ ?equip bim:hasBoomLength ?boomLength }}
+    OPTIONAL {{ ?equip bim:hasLoadCapacity ?loadCapacity }}
+    OPTIONAL {{ ?cwa bim:hasName ?cwaName }}
+    OPTIONAL {{ ?cwa bim:hasMinColumnSpacing ?minSpacing }}
+}}
+ORDER BY ?equipName
+"""
+
+
+def get_todays_work(target_date: str) -> str:
+    """오늘 할 일을 조회한다 (AWP - Concept 3).
+
+    target_date: YYYY-MM-DD 형식
+    """
+    return f"""{PREFIXES}
+SELECT ?iwp ?iwpName ?cwp ?cwpName ?cwa ?cwaName
+       ?startDate ?endDate ?constraintStatus
+       (COUNT(?elem) AS ?elementCount)
+WHERE {{
+    ?iwp a awp:InstallationWorkPackage .
+    ?iwp awp:hasStartDate ?startDate .
+    ?iwp awp:hasEndDate ?endDate .
+    FILTER(?startDate <= "{target_date}"^^xsd:date && ?endDate >= "{target_date}"^^xsd:date)
+    OPTIONAL {{ ?iwp rdfs:label ?iwpName }}
+    OPTIONAL {{ ?iwp awp:hasConstraintStatus ?constraintStatus }}
+    OPTIONAL {{
+        ?iwp awp:belongsToCWP ?cwp .
+        OPTIONAL {{ ?cwp rdfs:label ?cwpName }}
+        OPTIONAL {{
+            ?cwp awp:belongsToCWA ?cwa .
+            OPTIONAL {{ ?cwa rdfs:label ?cwaName }}
+        }}
+    }}
+    OPTIONAL {{ ?iwp awp:includesElement ?elem }}
+}}
+GROUP BY ?iwp ?iwpName ?cwp ?cwpName ?cwa ?cwaName ?startDate ?endDate ?constraintStatus
+ORDER BY ?cwaName ?cwpName ?iwpName
+"""
+
+
+def get_iwp_constraints(iwp_id: str) -> str:
+    """IWP의 제약 조건 및 포함 요소를 조회한다."""
+    return f"""{PREFIXES}
+SELECT ?iwp ?iwpName ?startDate ?endDate ?constraintStatus ?isExecutable
+       ?elem ?elemName ?elemCategory ?deliveryStatus ?isReady
+WHERE {{
+    ?iwp rdfs:label "{iwp_id}" .
+    ?iwp a awp:InstallationWorkPackage .
+    OPTIONAL {{ ?iwp rdfs:label ?iwpName }}
+    OPTIONAL {{ ?iwp awp:hasStartDate ?startDate }}
+    OPTIONAL {{ ?iwp awp:hasEndDate ?endDate }}
+    OPTIONAL {{ ?iwp awp:hasConstraintStatus ?constraintStatus }}
+    OPTIONAL {{ ?iwp awp:isExecutable ?isExecutable }}
+    OPTIONAL {{
+        ?iwp awp:includesElement ?elem .
+        OPTIONAL {{ ?elem bim:hasName ?elemName }}
+        OPTIONAL {{ ?elem bim:hasCategory ?elemCategory }}
+        OPTIONAL {{ ?elem bim:hasDeliveryStatus ?deliveryStatus }}
+        OPTIONAL {{ ?elem bim:isReady ?isReady }}
+    }}
+}}
+ORDER BY ?elemName
+"""
+
+
+def get_delivery_status_summary() -> str:
+    """배송 상태별 요소 수를 집계한다."""
+    return f"""{PREFIXES}
+SELECT ?deliveryStatus (COUNT(?elem) AS ?count)
+WHERE {{
+    ?elem bim:hasDeliveryStatus ?deliveryStatus .
+}}
+GROUP BY ?deliveryStatus
+ORDER BY DESC(?count)
+"""
+
+
 # 쿼리 템플릿 레지스트리
 QUERY_TEMPLATES = {
     "get_all_elements_by_category": get_all_elements_by_category,
@@ -186,4 +317,11 @@ QUERY_TEMPLATES = {
     "get_element_detail": get_element_detail,
     "get_all_buildings": get_all_buildings,
     "get_overall_statistics": get_overall_statistics,
+    # Lean Layer queries
+    "get_delayed_elements": get_delayed_elements,
+    "get_not_ready_elements": get_not_ready_elements,
+    "get_equipment_access_zones": get_equipment_access_zones,
+    "get_todays_work": get_todays_work,
+    "get_iwp_constraints": get_iwp_constraints,
+    "get_delivery_status_summary": get_delivery_status_summary,
 }

@@ -1,5 +1,7 @@
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix bim: <http://example.org/bim-ontology/schema#> .
+@prefix sched: <http://example.org/bim-ontology/schedule#> .
+@prefix awp: <http://example.org/bim-ontology/awp#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -54,4 +56,103 @@ bim:PlantPropertySetShape
         sh:path bim:hasName ;
         sh:minCount 1 ;
         sh:message "PlantPropertySet must have a name" ;
+    ] .
+
+# Material: must have hasMaterialName (xsd:string)
+bim:MaterialShape
+    a sh:NodeShape ;
+    sh:targetClass bim:Material ;
+    sh:property [
+        sh:path bim:hasMaterialName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Material must have a name (xsd:string)" ;
+    ] .
+
+# ClassificationReference: must have hasClassificationName
+bim:ClassificationReferenceShape
+    a sh:NodeShape ;
+    sh:targetClass bim:ClassificationReference ;
+    sh:property [
+        sh:path bim:hasClassificationName ;
+        sh:minCount 1 ;
+        sh:message "ClassificationReference must have a name" ;
+    ] .
+
+# ===== Lean Layer SHACL Shapes =====
+
+# ConstructionTask: must have planned dates
+sched:ConstructionTaskShape
+    a sh:NodeShape ;
+    sh:targetClass sched:ConstructionTask ;
+    sh:property [
+        sh:path sched:hasPlannedStart ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:message "ConstructionTask must have a planned start date" ;
+    ] ;
+    sh:property [
+        sh:path sched:hasPlannedEnd ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:message "ConstructionTask must have a planned end date" ;
+    ] .
+
+# InstallationWorkPackage: must have dates and constraint status
+awp:InstallationWorkPackageShape
+    a sh:NodeShape ;
+    sh:targetClass awp:InstallationWorkPackage ;
+    sh:property [
+        sh:path awp:hasStartDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:message "IWP must have a start date" ;
+    ] ;
+    sh:property [
+        sh:path awp:hasEndDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:message "IWP must have an end date" ;
+    ] ;
+    sh:property [
+        sh:path awp:hasConstraintStatus ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:in ( "AllCleared" "PendingMaterial" "PendingApproval" "PendingPredecessor" ) ;
+        sh:message "IWP must have a valid constraint status" ;
+    ] .
+
+# ElementStatus: must have value and date
+bim:ElementStatusShape
+    a sh:NodeShape ;
+    sh:targetClass bim:ElementStatus ;
+    sh:property [
+        sh:path bim:hasStatusValue ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:in ( "Planned" "Designed" "Fabricated" "Shipped" "OnSite" "Installed" "Inspected" ) ;
+        sh:message "ElementStatus must have a valid status value" ;
+    ] ;
+    sh:property [
+        sh:path bim:hasStatusDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:message "ElementStatus must have a date" ;
+    ] .
+
+# ConstructionEquipment: must have dimensions
+bim:ConstructionEquipmentShape
+    a sh:NodeShape ;
+    sh:targetClass bim:ConstructionEquipment ;
+    sh:property [
+        sh:path bim:hasEquipmentWidth ;
+        sh:datatype xsd:double ;
+        sh:minCount 1 ;
+        sh:message "Equipment must have a width" ;
+    ] ;
+    sh:property [
+        sh:path bim:hasEquipmentHeight ;
+        sh:datatype xsd:double ;
+        sh:minCount 1 ;
+        sh:message "Equipment must have a height" ;
     ] .

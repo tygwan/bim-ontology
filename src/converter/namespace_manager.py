@@ -13,6 +13,8 @@ IFC2X3 = Namespace("https://standards.buildingsmart.org/IFC/DEV/IFC2x3/TC1/OWL#"
 # 프로젝트 온톨로지 네임스페이스
 BIM = Namespace("http://example.org/bim-ontology/schema#")
 INST = Namespace("http://example.org/bim-ontology/instance#")
+SCHED = Namespace("http://example.org/bim-ontology/schedule#")
+AWP = Namespace("http://example.org/bim-ontology/awp#")
 
 # EXPRESS 스키마 네임스페이스
 EXPRESS = Namespace("https://w3id.org/express#")
@@ -65,6 +67,8 @@ def bind_namespaces(graph: Graph, schema: str = "IFC4") -> Graph:
     graph.bind("ifc", ifc_ns)
     graph.bind("bim", BIM)
     graph.bind("inst", INST)
+    graph.bind("sched", SCHED)
+    graph.bind("awp", AWP)
     graph.bind("express", EXPRESS)
     graph.bind("bot", BOT)
     graph.bind("sp3d", SP3D)

@@ -66,6 +66,9 @@ class RDFConverter:
         self._convert_aggregation_relations(parser)
         self._convert_containment_relations(parser)
         self._convert_property_sets(parser)
+        self._convert_quantities(parser)
+        self._convert_materials(parser)
+        self._convert_classifications(parser)
 
         self._stats["convert_time"] = time.time() - start
         self._stats["triples_generated"] = len(self._graph)
@@ -169,6 +172,54 @@ class RDFConverter:
             g.add((prop, RDF.type, OWL.DatatypeProperty))
             g.add((prop, RDFS.domain, domain))
             g.add((prop, RDFS.range, range_type))
+
+        # 수량 프로퍼티
+        quantity_props = {
+            "hasArea": (BIM.PhysicalElement, XSD.double),
+            "hasLength": (BIM.PhysicalElement, XSD.double),
+            "hasVolume": (BIM.PhysicalElement, XSD.double),
+            "hasWeight": (BIM.PhysicalElement, XSD.double),
+        }
+        for prop_name, (domain, range_type) in quantity_props.items():
+            prop = BIM[prop_name]
+            g.add((prop, RDF.type, OWL.DatatypeProperty))
+            g.add((prop, RDFS.domain, domain))
+            g.add((prop, RDFS.range, range_type))
+
+        # 재료 클래스 및 프로퍼티
+        g.add((BIM.Material, RDF.type, OWL.Class))
+        g.add((BIM.Material, RDFS.label, Literal("Material")))
+
+        material_props = {
+            "hasMaterialName": (BIM.Material, XSD.string),
+        }
+        for prop_name, (domain, range_type) in material_props.items():
+            prop = BIM[prop_name]
+            g.add((prop, RDF.type, OWL.DatatypeProperty))
+            g.add((prop, RDFS.domain, domain))
+            g.add((prop, RDFS.range, range_type))
+
+        g.add((BIM.hasMaterial, RDF.type, OWL.ObjectProperty))
+        g.add((BIM.hasMaterial, RDFS.domain, BIM.PhysicalElement))
+        g.add((BIM.hasMaterial, RDFS.range, BIM.Material))
+
+        # 분류 클래스 및 프로퍼티
+        g.add((BIM.ClassificationReference, RDF.type, OWL.Class))
+        g.add((BIM.ClassificationReference, RDFS.label, Literal("Classification Reference")))
+
+        classification_props = {
+            "hasClassificationName": (BIM.ClassificationReference, XSD.string),
+            "hasClassificationSystem": (BIM.ClassificationReference, XSD.string),
+        }
+        for prop_name, (domain, range_type) in classification_props.items():
+            prop = BIM[prop_name]
+            g.add((prop, RDF.type, OWL.DatatypeProperty))
+            g.add((prop, RDFS.domain, domain))
+            g.add((prop, RDFS.range, range_type))
+
+        g.add((BIM.hasClassification, RDF.type, OWL.ObjectProperty))
+        g.add((BIM.hasClassification, RDFS.domain, BIM.PhysicalElement))
+        g.add((BIM.hasClassification, RDFS.range, BIM.ClassificationReference))
 
         # 오브젝트 프로퍼티
         g.add((BIM.containsElement, RDF.type, OWL.ObjectProperty))
@@ -311,6 +362,120 @@ class RDFConverter:
             for obj in rel.RelatedObjects:
                 obj_uri = self._entity_uri(obj)
                 g.add((obj_uri, BIM.hasPropertySet, pset_uri))
+
+    def _convert_quantities(self, parser: IFCParser):
+        """IfcElementQuantity를 통한 수량 정보를 변환한다."""
+        g = self._graph
+        quantity_map = {
+            "IfcQuantityArea": ("AreaValue", BIM.hasArea),
+            "IfcQuantityLength": ("LengthValue", BIM.hasLength),
+            "IfcQuantityVolume": ("VolumeValue", BIM.hasVolume),
+            "IfcQuantityWeight": ("WeightValue", BIM.hasWeight),
+        }
+
+        count = 0
+        for rel in parser.get_entities("IfcRelDefinesByProperties"):
+            qset = rel.RelatingPropertyDefinition
+            if not qset.is_a("IfcElementQuantity"):
+                continue
+            if not hasattr(qset, "Quantities") or not qset.Quantities:
+                continue
+
+            for q in qset.Quantities:
+                q_type = q.is_a()
+                if q_type not in quantity_map:
+                    continue
+                attr_name, bim_prop = quantity_map[q_type]
+                value = getattr(q, attr_name, None)
+                if value is None:
+                    continue
+
+                for obj in rel.RelatedObjects:
+                    obj_uri = self._entity_uri(obj)
+                    g.add((obj_uri, bim_prop, Literal(value, datatype=XSD.double)))
+                    count += 1
+
+        if count > 0:
+            logger.info("수량 트리플 %d개 추가", count)
+
+    def _convert_materials(self, parser: IFCParser):
+        """IfcRelAssociatesMaterial을 통한 재료 정보를 변환한다."""
+        g = self._graph
+        material_cache: dict[int, URIRef] = {}
+        count = 0
+
+        for rel in parser.get_entities("IfcRelAssociatesMaterial"):
+            mat_usage = rel.RelatingMaterial
+            material = None
+
+            # IfcMaterial 직접 참조
+            if mat_usage.is_a("IfcMaterial"):
+                material = mat_usage
+            # IfcMaterialLayerSetUsage → IfcMaterialLayerSet → IfcMaterialLayer → IfcMaterial
+            elif hasattr(mat_usage, "ForLayerSet"):
+                layer_set = mat_usage.ForLayerSet
+                if hasattr(layer_set, "MaterialLayers") and layer_set.MaterialLayers:
+                    first_layer = layer_set.MaterialLayers[0]
+                    if hasattr(first_layer, "Material"):
+                        material = first_layer.Material
+            # IfcMaterialLayerSet 직접
+            elif mat_usage.is_a("IfcMaterialLayerSet"):
+                if hasattr(mat_usage, "MaterialLayers") and mat_usage.MaterialLayers:
+                    first_layer = mat_usage.MaterialLayers[0]
+                    if hasattr(first_layer, "Material"):
+                        material = first_layer.Material
+
+            if material is None:
+                continue
+
+            mat_id = material.id()
+            if mat_id not in material_cache:
+                mat_uri = INST[f"material_{mat_id}"]
+                g.add((mat_uri, RDF.type, BIM.Material))
+                if material.Name:
+                    g.add((mat_uri, BIM.hasMaterialName, Literal(material.Name)))
+                    g.add((mat_uri, RDFS.label, Literal(material.Name)))
+                material_cache[mat_id] = mat_uri
+
+            mat_uri = material_cache[mat_id]
+            for obj in rel.RelatedObjects:
+                obj_uri = self._entity_uri(obj)
+                g.add((obj_uri, BIM.hasMaterial, mat_uri))
+                count += 1
+
+        if count > 0:
+            logger.info("재료 트리플 %d개 추가", count)
+
+    def _convert_classifications(self, parser: IFCParser):
+        """IfcRelAssociatesClassification을 통한 분류 정보를 변환한다."""
+        g = self._graph
+        count = 0
+
+        for rel in parser.get_entities("IfcRelAssociatesClassification"):
+            cls_ref = rel.RelatingClassification
+            if cls_ref is None:
+                continue
+
+            ref_uri = INST[f"classref_{cls_ref.id()}"]
+            g.add((ref_uri, RDF.type, BIM.ClassificationReference))
+
+            ref_name = getattr(cls_ref, "Name", None) or getattr(cls_ref, "Identification", None)
+            if ref_name:
+                g.add((ref_uri, BIM.hasClassificationName, Literal(ref_name)))
+                g.add((ref_uri, RDFS.label, Literal(ref_name)))
+
+            # 분류 체계 이름 (IfcClassification.Name)
+            ref_source = getattr(cls_ref, "ReferencedSource", None)
+            if ref_source and hasattr(ref_source, "Name") and ref_source.Name:
+                g.add((ref_uri, BIM.hasClassificationSystem, Literal(ref_source.Name)))
+
+            for obj in rel.RelatedObjects:
+                obj_uri = self._entity_uri(obj)
+                g.add((obj_uri, BIM.hasClassification, ref_uri))
+                count += 1
+
+        if count > 0:
+            logger.info("분류 트리플 %d개 추가", count)
 
     def _entity_uri(self, entity: Any) -> URIRef:
         """IFC 엔티티의 고유 URI를 생성한다.

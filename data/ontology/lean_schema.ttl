@@ -1,0 +1,239 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bim: <http://example.org/bim-ontology/schema#> .
+@prefix sched: <http://example.org/bim-ontology/schedule#> .
+@prefix awp: <http://example.org/bim-ontology/awp#> .
+
+# =============================================================================
+# Lean Layer Ontology for BIM Schedule, Status, AWP, Equipment
+# =============================================================================
+
+# ===== Schedule Ontology =====
+
+sched:ConstructionTask a owl:Class ;
+    rdfs:subClassOf bim:BIMElement ;
+    rdfs:label "Construction Task" ;
+    rdfs:comment "A scheduled construction activity linked to physical elements" .
+
+sched:WorkSchedule a owl:Class ;
+    rdfs:label "Work Schedule" ;
+    rdfs:comment "A collection of construction tasks forming a project schedule" .
+
+# Task data properties
+sched:hasPlannedStart a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:date ;
+    rdfs:label "Planned Start Date" .
+
+sched:hasPlannedEnd a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:date ;
+    rdfs:label "Planned End Date" .
+
+sched:hasActualStart a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:date ;
+    rdfs:label "Actual Start Date" .
+
+sched:hasActualEnd a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:date ;
+    rdfs:label "Actual End Date" .
+
+sched:hasDuration a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:string ;
+    rdfs:label "Duration (ISO 8601)" .
+
+sched:hasPlannedInstallDate a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:date ;
+    rdfs:label "Planned Installation Date" .
+
+# Task relationships
+sched:precedes a owl:ObjectProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range sched:ConstructionTask ;
+    rdfs:label "Precedes (successor)" .
+
+sched:follows a owl:ObjectProperty ;
+    owl:inverseOf sched:precedes ;
+    rdfs:label "Follows (predecessor)" .
+
+sched:assignedToTask a owl:ObjectProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range sched:ConstructionTask ;
+    rdfs:label "Assigned to Task" .
+
+sched:hasAssignedElement a owl:ObjectProperty ;
+    owl:inverseOf sched:assignedToTask ;
+    rdfs:label "Has Assigned Element" .
+
+sched:belongsToSchedule a owl:ObjectProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range sched:WorkSchedule ;
+    rdfs:label "Belongs to Schedule" .
+
+# ===== Status Ontology (OPM-inspired) =====
+
+bim:ElementStatus a owl:Class ;
+    rdfs:label "Element Status" ;
+    rdfs:comment "Tracks lifecycle state of a physical element" .
+
+bim:hasStatus a owl:ObjectProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range bim:ElementStatus ;
+    rdfs:label "Has Status" .
+
+bim:hasStatusValue a owl:DatatypeProperty ;
+    rdfs:domain bim:ElementStatus ;
+    rdfs:range xsd:string ;
+    rdfs:label "Status Value" ;
+    rdfs:comment "Planned | Designed | Fabricated | Shipped | OnSite | Installed | Inspected" .
+
+bim:hasStatusDate a owl:DatatypeProperty ;
+    rdfs:domain bim:ElementStatus ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "Status Date" .
+
+bim:hasDeliveryStatus a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:string ;
+    rdfs:label "Delivery Status" ;
+    rdfs:comment "Ordered | InProduction | Shipped | OnSite | Installed" .
+
+bim:isReady a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "Is Ready for Installation" .
+
+bim:isDelayed a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "Is Delayed (inferred)" .
+
+bim:hasUnitCost a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:double ;
+    rdfs:label "Unit Cost" .
+
+# ===== AWP (Advanced Work Packaging) Ontology =====
+
+awp:ConstructionWorkArea a owl:Class ;
+    rdfs:subClassOf bim:SpatialElement ;
+    rdfs:label "Construction Work Area (CWA)" ;
+    rdfs:comment "Geographic zone for construction work" .
+
+awp:ConstructionWorkPackage a owl:Class ;
+    rdfs:label "Construction Work Package (CWP)" ;
+    rdfs:comment "Discipline/area-based work package" .
+
+awp:InstallationWorkPackage a owl:Class ;
+    rdfs:label "Installation Work Package (IWP)" ;
+    rdfs:comment "1-2 week executable field work package with constraint release" .
+
+# AWP hierarchy
+awp:belongsToCWA a owl:ObjectProperty ;
+    rdfs:domain awp:ConstructionWorkPackage ;
+    rdfs:range awp:ConstructionWorkArea ;
+    rdfs:label "Belongs to CWA" .
+
+awp:belongsToCWP a owl:ObjectProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range awp:ConstructionWorkPackage ;
+    rdfs:label "Belongs to CWP" .
+
+awp:belongsToCWP_ID a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:string ;
+    rdfs:label "CWP ID (shortcut)" .
+
+# IWP ↔ Element
+awp:includesElement a owl:ObjectProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range bim:PhysicalElement ;
+    rdfs:label "Includes Element" .
+
+awp:assignedToIWP a owl:ObjectProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range awp:InstallationWorkPackage ;
+    owl:inverseOf awp:includesElement ;
+    rdfs:label "Assigned to IWP" .
+
+# IWP scheduling
+awp:hasStartDate a owl:DatatypeProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range xsd:date ;
+    rdfs:label "IWP Start Date" .
+
+awp:hasEndDate a owl:DatatypeProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range xsd:date ;
+    rdfs:label "IWP End Date" .
+
+awp:hasConstraintStatus a owl:DatatypeProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range xsd:string ;
+    rdfs:label "Constraint Status" ;
+    rdfs:comment "AllCleared | PendingMaterial | PendingApproval | PendingPredecessor" .
+
+awp:isExecutable a owl:DatatypeProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "Is Executable (inferred)" .
+
+# IWP dependencies
+awp:dependsOn a owl:ObjectProperty ;
+    rdfs:domain awp:InstallationWorkPackage ;
+    rdfs:range awp:InstallationWorkPackage ;
+    rdfs:label "Depends On" .
+
+# ===== Equipment Ontology =====
+
+bim:ConstructionEquipment a owl:Class ;
+    rdfs:label "Construction Equipment" ;
+    rdfs:comment "Heavy equipment used in construction (crane, forklift, etc.)" .
+
+bim:hasEquipmentWidth a owl:DatatypeProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range xsd:double ;
+    rdfs:label "Equipment Width (m)" .
+
+bim:hasEquipmentHeight a owl:DatatypeProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range xsd:double ;
+    rdfs:label "Equipment Height (m)" .
+
+bim:hasTurningRadius a owl:DatatypeProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range xsd:double ;
+    rdfs:label "Turning Radius (m)" .
+
+bim:hasBoomLength a owl:DatatypeProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range xsd:double ;
+    rdfs:label "Boom Length (m)" .
+
+bim:hasLoadCapacity a owl:DatatypeProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range xsd:double ;
+    rdfs:label "Load Capacity (ton)" .
+
+bim:canAccessZone a owl:ObjectProperty ;
+    rdfs:domain bim:ConstructionEquipment ;
+    rdfs:range awp:ConstructionWorkArea ;
+    rdfs:label "Can Access Zone" .
+
+# ===== Spatial Extension (for constructability) =====
+
+bim:hasMinColumnSpacing a owl:DatatypeProperty ;
+    rdfs:domain awp:ConstructionWorkArea ;
+    rdfs:range xsd:double ;
+    rdfs:label "Minimum Column Spacing (m)" .
+
+bim:hasFloorHeight a owl:DatatypeProperty ;
+    rdfs:domain bim:BuildingStorey ;
+    rdfs:range xsd:double ;
+    rdfs:label "Floor-to-Floor Height (m)" .

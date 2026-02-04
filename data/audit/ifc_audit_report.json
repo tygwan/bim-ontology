@@ -1,0 +1,171 @@
+{
+  "file": "nwd4op-12.ifc",
+  "schema": "IFC4",
+  "total_entities": 66538,
+  "entity_type_counts": {
+    "IfcDirection": 7826,
+    "IfcCartesianPoint": 3915,
+    "IfcAxis2Placement3D": 3914,
+    "IfcLocalPlacement": 3913,
+    "IfcShapeRepresentation": 3911,
+    "IfcProductDefinitionShape": 3911,
+    "IfcPresentationLayerAssignment": 3911,
+    "IfcPropertySet": 3911,
+    "IfcRelDefinesByProperties": 3911,
+    "IfcBuildingElementProxy": 3911,
+    "IfcTriangulatedFaceSet": 3911,
+    "IfcCartesianPointList3D": 3911,
+    "IfcColourRgb": 3911,
+    "IfcSurfaceStyleRendering": 3911,
+    "IfcSurfaceStyle": 3911,
+    "IfcStyledItem": 3911,
+    "IfcSIUnit": 18,
+    "IfcRelAggregates": 3,
+    "IfcOwnerHistory": 2,
+    "IfcOrganization": 2,
+    "IfcUnitAssignment": 2,
+    "IfcGeometricRepresentationContext": 2,
+    "IfcBuildingStorey": 1,
+    "IfcRelContainedInSpatialStructure": 1,
+    "IfcProject": 1,
+    "IfcPerson": 1,
+    "IfcPersonAndOrganization": 1,
+    "IfcApplication": 1,
+    "IfcAxis2Placement2D": 1,
+    "IfcSite": 1,
+    "IfcBuilding": 1
+  },
+  "unique_types": 31,
+  "spatial_structure": {
+    "IfcProject": {
+      "count": 1,
+      "names": [
+        ""
+      ]
+    },
+    "IfcSite": {
+      "count": 1,
+      "names": [
+        ""
+      ]
+    },
+    "IfcBuilding": {
+      "count": 1,
+      "names": [
+        ""
+      ]
+    },
+    "IfcBuildingStorey": {
+      "count": 1,
+      "names": [
+        "B01-EquipmentSystems"
+      ]
+    },
+    "IfcSpace": {
+      "count": 0,
+      "names": []
+    }
+  },
+  "physical_elements": {
+    "IfcBuildingElementProxy": 3911
+  },
+  "total_physical_elements": 3911,
+  "propertyset_relation_count": 3911,
+  "property_sets": {
+    "Pset_BuildingElementProxyCommon": {
+      "type": "IfcPropertySet",
+      "property_count": 0,
+      "property_names": [],
+      "usage_count": 3911
+    }
+  },
+  "property_set_count": 1,
+  "element_quantities": {},
+  "element_quantity_set_count": 0,
+  "materials": {
+    "count": 0,
+    "names": []
+  },
+  "material_layer_sets": {
+    "count": 0
+  },
+  "material_associations": {
+    "count": 0
+  },
+  "classifications": {
+    "count": 0,
+    "names": []
+  },
+  "classification_references": {
+    "count": 0
+  },
+  "classification_associations": {
+    "count": 0
+  },
+  "schedule_cost_entities": {
+    "IfcWorkSchedule": 0,
+    "IfcWorkPlan": 0,
+    "IfcTask": 0,
+    "IfcTaskTime": 0,
+    "IfcRelSequence": 0,
+    "IfcRelAssignsToProcess": 0,
+    "IfcCostSchedule": 0,
+    "IfcCostItem": 0,
+    "IfcCostValue": 0
+  },
+  "has_schedule_data": false,
+  "has_cost_data": false,
+  "relationships": {
+    "IfcRelAggregates": 3,
+    "IfcRelContainedInSpatialStructure": 1,
+    "IfcRelDefinesByProperties": 3911,
+    "IfcRelDefinesByType": 0,
+    "IfcRelAssociatesMaterial": 0,
+    "IfcRelAssociatesClassification": 0,
+    "IfcRelConnectsPathElements": 0,
+    "IfcRelFillsElement": 0,
+    "IfcRelVoidsElement": 0,
+    "IfcRelSpaceBoundary": 0
+  },
+  "proxy_name_prefixes": {
+    "MemberPartPrismatic": 570,
+    "MemberSystem": 566,
+    "Aspects": 516,
+    "Beam": 375,
+    "Pipe": 210,
+    "Anvil": 144,
+    "Flange": 130,
+    "Insulation Volume": 114,
+    "Geometry": 114,
+    "90 Degree Direction Change": 106,
+    "Column": 70,
+    "Distillation Unit B01": 61,
+    "Assy": 43,
+    "SlopedDB": 40,
+    "Slab": 36,
+    "P": 33,
+    "PR01": 29,
+    "Utility": 28,
+    "Brace": 26,
+    "TMTHandrail": 24,
+    "VG3": 23,
+    "HgrProfile": 20,
+    "RectFtgGroutPad": 19,
+    "BoundedRectFootingPier": 19,
+    "BoundedRectPierFootingAsm": 19,
+    "B": 17,
+    "G4G": 16,
+    "HgrAisc31": 16,
+    "Refining Pipe Rack": 16,
+    "Concentric Size Change": 16
+  },
+  "summary": {
+    "has_property_sets": true,
+    "has_quantities": false,
+    "has_materials": false,
+    "has_classifications": false,
+    "has_schedule": false,
+    "has_cost": false,
+    "data_richness": 1
+  }
+}

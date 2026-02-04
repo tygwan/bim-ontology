@@ -1,5 +1,51 @@
 {
-  "types": [],
-  "properties": [],
-  "links": []
+  "types": [
+    {
+      "name": "ConstructionTask",
+      "parent_class": "BIMElement",
+      "label": "Construction Task",
+      "description": "A scheduled construction activity"
+    },
+    {
+      "name": "InstallationWorkPackage",
+      "parent_class": "BIMElement",
+      "label": "Installation Work Package (IWP)",
+      "description": "1-2 week executable field work package"
+    }
+  ],
+  "properties": [
+    {
+      "name": "hasPlannedStart",
+      "domain": "ConstructionTask",
+      "range_type": "date",
+      "label": "Planned Start Date"
+    },
+    {
+      "name": "hasPlannedEnd",
+      "domain": "ConstructionTask",
+      "range_type": "date",
+      "label": "Planned End Date"
+    },
+    {
+      "name": "hasDeliveryStatus",
+      "domain": "PhysicalElement",
+      "range_type": "string",
+      "label": "Delivery Status"
+    },
+    {
+      "name": "hasUnitCost",
+      "domain": "PhysicalElement",
+      "range_type": "double",
+      "label": "Unit Cost"
+    }
+  ],
+  "links": [
+    {
+      "name": "assignedToTask",
+      "domain": "PhysicalElement",
+      "range_class": "ConstructionTask",
+      "inverse_name": "hasAssignedElement",
+      "label": "Assigned to Task"
+    }
+  ]
 }

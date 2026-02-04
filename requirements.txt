@@ -12,6 +12,7 @@ pyshacl>=0.26.0
 # Web Framework
 fastapi>=0.100.0
 uvicorn>=0.20.0
+python-multipart>=0.0.6
 
 # Testing
 pytest>=7.0.0

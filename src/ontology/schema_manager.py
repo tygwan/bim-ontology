@@ -224,6 +224,9 @@ class OntologySchemaManager:
         "double": XSD.double,
         "integer": XSD.integer,
         "boolean": XSD.boolean,
+        "date": XSD.date,
+        "dateTime": XSD.dateTime,
+        "duration": XSD.duration,
     }
 
     def apply_schema_to_graph(self, graph: Graph) -> int:
