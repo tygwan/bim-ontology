@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Projects using cc-initializer framework",
+  "howToAdd": "Submit a PR adding your project to the 'projects' array",
+  "projects": [
+    {
+      "name": "tygwan/dxtnavis",
+      "url": "https://github.com/tygwan/dxtnavis",
+      "description": "DXT Navigator - Real-world example project"
+    }
+  ]
+}

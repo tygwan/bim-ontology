@@ -1,0 +1,52 @@
+{
+  "name": "astro",
+  "version": "1.0.0",
+  "description": "Astro framework plugin - agents, skills, hooks, and commands for building Astro sites",
+  "author": {
+    "name": "Tygwan",
+    "url": "https://github.com/tygwan"
+  },
+  "homepage": "https://github.com/tygwan/skills/tree/master/astro",
+  "keywords": [
+    "astro",
+    "ssg",
+    "static-site",
+    "frontend",
+    "react-islands",
+    "content-collections",
+    "i18n",
+    "deployment",
+    "github-pages"
+  ],
+  "components": {
+    "skills": [
+      "skill.md",
+      "skills/astro-init.md",
+      "skills/astro-component.md",
+      "skills/astro-deploy.md",
+      "skills/astro-i18n.md",
+      "skills/astro-content.md",
+      "skills/json-codex.md"
+    ],
+    "agents": [
+      "agents/astro-architect.md",
+      "agents/astro-frontend.md",
+      "agents/astro-devops.md",
+      "agents/astro-reviewer.md",
+      "agents/json-codex-editor.md"
+    ],
+    "hooks": [
+      "hooks/astro-build-check.sh",
+      "hooks/astro-deploy-verify.sh"
+    ],
+    "commands": [
+      "commands/astro-new.md",
+      "commands/astro-build.md",
+      "commands/astro-preview.md"
+    ]
+  },
+  "dependencies": {
+    "runtime": ["node >= 18", "npm >= 9"],
+    "optional_skills": ["frontend-design", "react-expert", "d3js-skill", "codex"]
+  }
+}
