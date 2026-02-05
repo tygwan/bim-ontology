@@ -3,8 +3,9 @@
 dxtnavis에서 추출한 AllHierarchy CSV와 Schedule CSV를 RDF로 변환합니다.
 IFC 중간 단계 없이 원본 데이터의 풍부한 속성을 보존합니다.
 
-MVP 구현:
+MVP v2 구현:
 - AllHierarchy.csv → 계층 구조 + 속성 + SmartPlant 3D 정보
+- System Path 기반 실제 계층 구조 생성 (Area → Unit → Equipment)
 - schedule.csv → ConstructionTask + 요소 연결
 """
 
@@ -71,6 +72,7 @@ class NavisToRDFConverter:
         self._add_schema()
         self._object_cache: Dict[str, URIRef] = {}
         self._hierarchy: Dict[str, Dict] = {}
+        self._path_node_cache: Dict[str, URIRef] = {}  # System Path → URI
 
     def _bind_namespaces(self):
         """네임스페이스를 그래프에 바인딩한다."""
@@ -98,6 +100,26 @@ class NavisToRDFConverter:
         self.graph.add((NAVIS.SP3DEntity, RDF.type, OWL.Class))
         self.graph.add((NAVIS.SP3DEntity, RDFS.subClassOf, NAVIS.NavisElement))
         self.graph.add((NAVIS.SP3DEntity, RDFS.label, Literal("SmartPlant 3D Entity")))
+
+        # System Path 계층 구조 클래스
+        hierarchy_classes = [
+            (NAVIS.Project, "Project", "프로젝트 (최상위)"),
+            (NAVIS.Area, "Area", "영역 (Depth 1)"),
+            (NAVIS.Unit, "Unit", "유닛 (Depth 2)"),
+            (NAVIS.System, "System", "시스템 (Depth 3+)"),
+        ]
+        for cls, name, label in hierarchy_classes:
+            self.graph.add((cls, RDF.type, OWL.Class))
+            self.graph.add((cls, RDFS.subClassOf, NAVIS.NavisGroup))
+            self.graph.add((cls, RDFS.label, Literal(label)))
+
+        # 계층 관계 프로퍼티
+        self.graph.add((NAVIS.containsElement, RDF.type, OWL.ObjectProperty))
+        self.graph.add((NAVIS.containsElement, RDFS.label, Literal("Contains Element")))
+        self.graph.add((NAVIS.isContainedIn, RDF.type, OWL.ObjectProperty))
+        self.graph.add((NAVIS.isContainedIn, RDFS.label, Literal("Is Contained In")))
+        self.graph.add((NAVIS.hasSystemPathParent, RDF.type, OWL.ObjectProperty))
+        self.graph.add((NAVIS.hasSystemPathParent, RDFS.label, Literal("System Path Parent")))
 
         # Navis 프로퍼티
         props = [
@@ -147,6 +169,72 @@ class NavisToRDFConverter:
         self._object_cache[object_id] = uri
         return uri
 
+    def _get_or_create_path_node(self, system_path: str) -> URIRef:
+        """System Path에 해당하는 계층 노드를 가져오거나 생성한다.
+
+        Args:
+            system_path: 전체 시스템 경로 (예: "TRAINING\\Refining Area\\U01")
+
+        Returns:
+            해당 경로의 노드 URI
+        """
+        if system_path in self._path_node_cache:
+            return self._path_node_cache[system_path]
+
+        # 경로를 파싱
+        parts = system_path.split("\\")
+
+        # 모든 중간 경로 노드 생성
+        current_path = ""
+        parent_uri = None
+
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+
+            if current_path:
+                current_path = current_path + "\\" + part
+            else:
+                current_path = part
+
+            if current_path in self._path_node_cache:
+                parent_uri = self._path_node_cache[current_path]
+                continue
+
+            # 안전한 URI 생성 (특수문자 제거)
+            safe_path = current_path.replace("\\", "_").replace(" ", "_").replace("-", "_")
+            safe_path = "".join(c for c in safe_path if c.isalnum() or c == "_")
+            uri = INST[f"path_{safe_path}"]
+
+            # 깊이에 따른 타입 결정
+            if i == 0:
+                node_type = NAVIS.Project
+            elif i == 1:
+                node_type = NAVIS.Area
+            elif i == 2:
+                node_type = NAVIS.Unit
+            else:
+                node_type = NAVIS.System
+
+            # 트리플 추가
+            self.graph.add((uri, RDF.type, node_type))
+            self.graph.add((uri, RDF.type, NAVIS.NavisGroup))
+            self.graph.add((uri, RDFS.label, Literal(part)))
+            self.graph.add((uri, BIM.hasName, Literal(part)))
+            self.graph.add((uri, SP3D.hasSystemPath, Literal(current_path)))
+            self.graph.add((uri, NAVIS.hasLevel, Literal(i, datatype=XSD.integer)))
+
+            # 부모-자식 관계
+            if parent_uri:
+                self.graph.add((uri, NAVIS.hasSystemPathParent, parent_uri))
+                self.graph.add((parent_uri, NAVIS.containsElement, uri))
+                self.graph.add((uri, NAVIS.isContainedIn, parent_uri))
+
+            self._path_node_cache[current_path] = uri
+            parent_uri = uri
+
+        return self._path_node_cache.get(system_path, parent_uri)
+
     def convert_hierarchy_csv(self, csv_path: str) -> Dict[str, Any]:
         """AllHierarchy CSV를 RDF로 변환한다.
 
@@ -163,6 +251,7 @@ class NavisToRDFConverter:
             "unique_objects": 0,
             "sp3d_entities": 0,
             "groups": 0,
+            "path_nodes": 0,
             "triples_added": 0,
             "categories": {},
         }
@@ -260,8 +349,18 @@ class NavisToRDFConverter:
                     prop_uri, datatype = self.SP3D_PROPERTY_MAP[prop_name]
                     self.graph.add((uri, prop_uri, Literal(prop_value, datatype=datatype)))
 
+            # System Path 기반 계층 연결
+            system_path = obj_data["sp3d_properties"].get("System Path", "")
+            if system_path:
+                path_node = self._get_or_create_path_node(system_path)
+                if path_node:
+                    self.graph.add((uri, NAVIS.isContainedIn, path_node))
+                    self.graph.add((path_node, NAVIS.containsElement, uri))
+
+        # 계층 노드 통계
+        stats["path_nodes"] = len(self._path_node_cache)
         stats["triples_added"] = len(self.graph) - initial_triples
-        logger.info(f"Added {stats['triples_added']} triples")
+        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes")
 
         return stats
 
@@ -398,6 +497,7 @@ if __name__ == "__main__":
     print(f"Unique objects: {result['hierarchy']['unique_objects']}")
     print(f"SP3D entities: {result['hierarchy']['sp3d_entities']}")
     print(f"Groups: {result['hierarchy']['groups']}")
+    print(f"System Path nodes: {result['hierarchy'].get('path_nodes', 0)}")
     print(f"\nCategories:")
     for cat, count in sorted(result['hierarchy']['categories'].items(), key=lambda x: -x[1])[:15]:
         print(f"  {cat}: {count}")
