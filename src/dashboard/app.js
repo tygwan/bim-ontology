@@ -21,6 +21,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         // Lazy-load tab data
         const tabName = tab.dataset.tab;
         if (tabName === 'buildings') loadHierarchy();
+        if (tabName === 'hierarchy') initHierarchyTab();
         if (tabName === 'elements') { loadCategoryFilter(); loadElements(); }
         if (tabName === 'properties') loadPlantData();
         if (tabName === 'ontology') { loadOntologyTypes(); loadOntologyLinks(); loadRules(); }
@@ -1474,6 +1475,235 @@ async function updateElementStatus() {
     } else {
         result.innerHTML = `<span class="text-red-400">Error: ${data?.detail || data?.error || 'Unknown'}</span>`;
     }
+}
+
+// ── Hierarchy Tab ──
+
+async function loadHierarchyComparison() {
+    const container = document.getElementById('hierarchy-comparison');
+
+    // Query hierarchy stats
+    const statsQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX bim: <http://example.org/bim-ontology/schema#>
+
+SELECT
+    (COUNT(DISTINCT ?proj) AS ?projects)
+    (COUNT(DISTINCT ?area) AS ?areas)
+    (COUNT(DISTINCT ?unit) AS ?units)
+    (COUNT(DISTINCT ?sys) AS ?systems)
+    (COUNT(DISTINCT ?elem) AS ?elements)
+WHERE {
+    OPTIONAL { ?proj a navis:Project }
+    OPTIONAL { ?area a navis:Area }
+    OPTIONAL { ?unit a navis:Unit }
+    OPTIONAL { ?sys a navis:System }
+    OPTIONAL { ?elem a navis:SP3DEntity }
+}`;
+
+    const data = await apiPost('/api/sparql', { query: statsQuery });
+
+    if (!data || !data.results || data.results.length === 0) {
+        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy stats</p>';
+        return;
+    }
+
+    const stats = data.results[0];
+
+    container.innerHTML = `
+        <div class="mb-4">
+            <h4 class="text-sm font-semibold text-blue-400 mb-2">Current Data (dxtnavis)</h4>
+            <table>
+                <tbody>
+                    <tr><td class="text-gray-400">Projects</td><td class="text-right font-bold">${stats.projects}</td></tr>
+                    <tr><td class="text-gray-400">Areas</td><td class="text-right font-bold">${stats.areas}</td></tr>
+                    <tr><td class="text-gray-400">Units</td><td class="text-right font-bold">${stats.units}</td></tr>
+                    <tr><td class="text-gray-400">Systems</td><td class="text-right font-bold">${stats.systems}</td></tr>
+                    <tr><td class="text-gray-400">Elements</td><td class="text-right font-bold text-green-400">${stats.elements}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="p-3 rounded" style="background:#1e3a5f22; border: 1px solid #1e3a5f;">
+            <h4 class="text-xs font-semibold text-blue-400 mb-2">vs IFC Export</h4>
+            <div class="text-xs text-gray-400">
+                <div>IFC: 1 Project → 1 Storey → 3,911 elem</div>
+                <div class="text-green-400 mt-1">+${(parseInt(stats.elements) - 3911).toLocaleString()} elements</div>
+                <div class="text-green-400">+${(parseInt(stats.projects) + parseInt(stats.areas) + parseInt(stats.units) + parseInt(stats.systems) - 4).toLocaleString()} hierarchy nodes</div>
+            </div>
+        </div>
+    `;
+}
+
+async function loadHierarchyTree() {
+    const container = document.getElementById('hierarchy-tree-view');
+    const maxDepth = parseInt(document.getElementById('hierarchy-depth').value);
+
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Building tree...</div>';
+
+    // Query hierarchy structure
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
+
+SELECT ?path ?name ?type (COUNT(?child) AS ?children)
+WHERE {
+    ?node a ?type ;
+          rdfs:label ?name ;
+          sp3d:hasSystemPath ?path .
+    FILTER(?type IN (navis:Project, navis:Area, navis:Unit, navis:System))
+    OPTIONAL { ?node navis:containsElement ?child }
+}
+GROUP BY ?path ?name ?type
+ORDER BY ?path
+LIMIT 500`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    if (!data || !data.results) {
+        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy</p>';
+        return;
+    }
+
+    // Build tree structure
+    const tree = {};
+    const typeColors = {
+        'Project': '#8b5cf6',
+        'Area': '#3b82f6',
+        'Unit': '#10b981',
+        'System': '#64748b'
+    };
+
+    data.results.forEach(row => {
+        const path = row.path;
+        const parts = path.split('\\\\');
+        if (parts.length > maxDepth) return;
+
+        const depth = parts.length - 1;
+        const typeName = row.type.split('#').pop();
+
+        if (!tree[depth]) tree[depth] = [];
+        tree[depth].push({
+            path: path,
+            name: row.name,
+            type: typeName,
+            children: parseInt(row.children) || 0,
+            color: typeColors[typeName] || '#94a3b8'
+        });
+    });
+
+    // Render tree
+    let html = '';
+
+    // Group by depth and render
+    for (let d = 0; d <= maxDepth; d++) {
+        const nodes = tree[d] || [];
+        if (nodes.length === 0) continue;
+
+        const groupedByParent = {};
+        nodes.forEach(n => {
+            const parts = n.path.split('\\\\');
+            const parentPath = parts.slice(0, -1).join('\\\\') || 'ROOT';
+            if (!groupedByParent[parentPath]) groupedByParent[parentPath] = [];
+            groupedByParent[parentPath].push(n);
+        });
+
+        Object.entries(groupedByParent).forEach(([parent, children]) => {
+            children.sort((a, b) => b.children - a.children);
+        });
+
+        tree[d] = nodes;
+    }
+
+    // Render as nested HTML
+    function renderNode(node, indent = 0) {
+        const margin = indent * 20;
+        return `
+            <div class="hierarchy-tree-node" style="margin-left: ${margin}px; padding: 4px 8px; cursor: pointer; border-radius: 4px;"
+                 onclick="loadHierarchyNodeDetail('${node.path.replace(/'/g, "\\'")}', '${node.name.replace(/'/g, "\\'")}')"
+                 onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <span class="node-icon" style="background: ${node.color}"></span>
+                <span class="text-sm">${node.name}</span>
+                <span class="badge" style="background: ${node.color}22; color: ${node.color}; margin-left: 8px;">${node.type}</span>
+                ${node.children > 0 ? `<span class="text-xs text-gray-500 ml-2">(${node.children})</span>` : ''}
+            </div>`;
+    }
+
+    // Simple flat render with indentation
+    const allNodes = [];
+    data.results.forEach(row => {
+        const path = row.path;
+        const parts = path.split('\\\\');
+        if (parts.length > maxDepth + 1) return;
+
+        const typeName = row.type.split('#').pop();
+        allNodes.push({
+            path: path,
+            name: row.name,
+            type: typeName,
+            children: parseInt(row.children) || 0,
+            color: typeColors[typeName] || '#94a3b8',
+            depth: parts.length - 1
+        });
+    });
+
+    // Sort by path to maintain hierarchy order
+    allNodes.sort((a, b) => a.path.localeCompare(b.path));
+
+    html = allNodes.map(n => renderNode(n, n.depth)).join('');
+
+    container.innerHTML = html || '<p class="text-gray-500">No hierarchy data found</p>';
+}
+
+async function loadHierarchyNodeDetail(path, name) {
+    const container = document.getElementById('hierarchy-details');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading elements...</div>';
+
+    // Query elements in this path
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
+PREFIX bim: <http://example.org/bim-ontology/schema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?name ?category ?status
+WHERE {
+    ?elem a navis:SP3DEntity ;
+          rdfs:label ?name ;
+          sp3d:hasSystemPath ?path .
+    FILTER(STRSTARTS(?path, "${path}"))
+    OPTIONAL { ?elem bim:hasCategory ?category }
+    OPTIONAL { ?elem sp3d:hasStatus ?status }
+}
+LIMIT 50`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    let html = `<h4 class="text-sm font-semibold text-blue-400 mb-3">${name} <span class="text-xs text-gray-500">(${path})</span></h4>`;
+
+    if (!data || !data.results || data.results.length === 0) {
+        html += '<p class="text-gray-500 text-sm">No elements found in this path.</p>';
+    } else {
+        html += '<table><thead><tr><th>Name</th><th>Category</th><th>Status</th></tr></thead><tbody>';
+        data.results.forEach(row => {
+            html += `<tr>
+                <td class="text-sm">${row.name || '-'}</td>
+                <td><span class="badge badge-blue">${row.category || '-'}</span></td>
+                <td class="text-xs text-gray-400">${row.status || '-'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        if (data.results.length >= 50) {
+            html += '<p class="text-xs text-gray-500 mt-2">Showing first 50 elements...</p>';
+        }
+    }
+
+    container.innerHTML = html;
+}
+
+function initHierarchyTab() {
+    loadHierarchyComparison();
+    loadHierarchyTree();
 }
 
 // ── Init ──

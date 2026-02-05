@@ -81,6 +81,7 @@
         <nav class="flex border-b border-gray-700 px-6" style="background: #1e293b;">
             <div class="nav-tab active" data-tab="overview">Overview</div>
             <div class="nav-tab" data-tab="buildings">Buildings</div>
+            <div class="nav-tab" data-tab="hierarchy">Hierarchy</div>
             <div class="nav-tab" data-tab="elements">Elements</div>
             <div class="nav-tab" data-tab="sparql">SPARQL</div>
             <div class="nav-tab" data-tab="properties">Properties</div>
@@ -153,6 +154,42 @@
                         <div class="card-header">Storeys & Elements</div>
                         <div class="card-body" id="storey-detail">
                             <p class="text-gray-500 text-sm">Select a building from the hierarchy to view details.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hierarchy Tab (System Path Visualization) -->
+            <div id="tab-hierarchy" class="tab-content" style="display:none">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">Data Comparison</div>
+                        <div class="card-body" id="hierarchy-comparison">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card col-span-2">
+                        <div class="card-header flex items-center justify-between">
+                            <span>System Path Tree</span>
+                            <div class="flex gap-2">
+                                <select id="hierarchy-depth" class="text-sm">
+                                    <option value="2">Depth 2 (Area)</option>
+                                    <option value="3" selected>Depth 3 (Unit)</option>
+                                    <option value="4">Depth 4 (System)</option>
+                                </select>
+                                <button class="btn btn-primary text-sm" onclick="loadHierarchyTree()">Load</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="height: 500px; overflow: auto;">
+                            <div id="hierarchy-tree-view"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Hierarchy Details</div>
+                    <div class="card-body">
+                        <div id="hierarchy-details">
+                            <p class="text-gray-500 text-sm">Select a node from the tree to view contained elements.</p>
                         </div>
                     </div>
                 </div>
