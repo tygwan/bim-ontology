@@ -1479,6 +1479,66 @@ async function updateElementStatus() {
 
 // ── Hierarchy Tab ──
 
+let hierarchyFilesLoaded = false;
+
+async function loadHierarchyFiles() {
+    if (hierarchyFilesLoaded) return;
+
+    const select = document.getElementById('hierarchy-file-select');
+    const data = await api('/api/reasoning/ttl-files');
+
+    if (!data || !data.files) {
+        select.innerHTML = '<option value="">Failed to load files</option>';
+        return;
+    }
+
+    select.innerHTML = data.files
+        .filter(f => f.name.endsWith('.ttl') || f.name.endsWith('.ttl.bak'))
+        .map(f => {
+            const label = f.name.endsWith('.bak') ? `${f.name} [IFC backup]` : f.name;
+            const selected = f.name === 'nwd4op-12.ttl' ? 'selected' : '';
+            return `<option value="${f.name}" ${selected}>${label} (${f.size_kb} KB)</option>`;
+        })
+        .join('');
+
+    hierarchyFilesLoaded = true;
+}
+
+async function loadSelectedFile() {
+    const select = document.getElementById('hierarchy-file-select');
+    const status = document.getElementById('hierarchy-file-status');
+    const fileName = select.value;
+
+    if (!fileName) {
+        status.textContent = 'Please select a file';
+        status.style.color = '#f87171';
+        return;
+    }
+
+    status.textContent = 'Loading...';
+    status.style.color = '#94a3b8';
+
+    try {
+        const data = await apiPost(`/api/reasoning/reload?file_name=${encodeURIComponent(fileName)}`, {});
+
+        if (data && data.status === 'success') {
+            status.textContent = `Loaded: ${formatNumber(data.triples)} triples`;
+            status.style.color = '#4ade80';
+
+            // Refresh all data
+            checkHealth();
+            loadHierarchyComparison();
+            loadHierarchyTree();
+        } else {
+            status.textContent = `Error: ${data?.detail || 'Unknown'}`;
+            status.style.color = '#f87171';
+        }
+    } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        status.style.color = '#f87171';
+    }
+}
+
 async function loadHierarchyComparison() {
     const container = document.getElementById('hierarchy-comparison');
 
@@ -1703,6 +1763,7 @@ LIMIT 50`;
 }
 
 function initHierarchyTab() {
+    loadHierarchyFiles();
     loadHierarchyComparison();
     loadHierarchyTree();
 }

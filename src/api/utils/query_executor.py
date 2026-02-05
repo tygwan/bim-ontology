@@ -32,3 +32,20 @@ def execute_sparql(query: str) -> list[dict[str, Any]]:
     """SPARQL 쿼리를 실행하고 결과를 반환한다."""
     store = get_store()
     return store.query(query)
+
+
+def reload_store(ttl_path: str) -> int:
+    """새로운 TTL 파일로 스토어를 다시 로드한다.
+
+    Args:
+        ttl_path: 로드할 TTL 파일의 절대 경로
+
+    Returns:
+        로드된 트리플 수
+    """
+    global _store
+    new_store = TripleStore()
+    new_store.load(ttl_path)
+    _store = new_store
+    logger.info("TripleStore 재로드 완료: %s (%d 트리플)", ttl_path, len(new_store))
+    return len(new_store)

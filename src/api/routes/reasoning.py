@@ -327,6 +327,39 @@ async def list_ttl_files():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/reasoning/reload")
+async def reload_ttl_file(file_name: str):
+    """지정된 TTL 파일로 스토어를 다시 로드한다.
+
+    Args:
+        file_name: 로드할 TTL 파일명 (data/rdf/ 내)
+
+    Returns:
+        로드 결과 (파일명, 트리플 수)
+    """
+    from ..utils.query_executor import reload_store
+
+    try:
+        ttl_path = _RDF_DIR / file_name
+        if not ttl_path.exists():
+            raise HTTPException(status_code=404, detail=f"파일을 찾을 수 없습니다: {file_name}")
+
+        if not (file_name.endswith(".ttl") or file_name.endswith(".ttl.bak")):
+            raise HTTPException(status_code=400, detail="TTL 파일만 로드할 수 있습니다")
+
+        triple_count = reload_store(str(ttl_path))
+        return {
+            "status": "success",
+            "file": file_name,
+            "triples": triple_count,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("TTL 파일 로드 실패: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/reasoning/validation-report")
 async def get_validation_report(ttl_file: str | None = None):
     """RDF 그래프 품질 검증 리포트를 반환한다.

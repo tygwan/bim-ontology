@@ -161,6 +161,20 @@
 
             <!-- Hierarchy Tab (System Path Visualization) -->
             <div id="tab-hierarchy" class="tab-content" style="display:none">
+                <!-- File Selector -->
+                <div class="card mb-4">
+                    <div class="card-header flex items-center justify-between">
+                        <span>RDF Data Source</span>
+                        <div class="flex gap-2 items-center">
+                            <select id="hierarchy-file-select" class="text-sm" style="min-width: 200px;">
+                                <option value="">Loading...</option>
+                            </select>
+                            <button class="btn btn-primary text-sm" onclick="loadSelectedFile()">Load File</button>
+                            <span id="hierarchy-file-status" class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-3 gap-4 mb-4">
                     <div class="card">
                         <div class="card-header">Data Comparison</div>
