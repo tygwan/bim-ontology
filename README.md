@@ -1,271 +1,328 @@
 # BIM Ontology
 
-> IFC(Industry Foundation Classes) 파일을 RDF/OWL 온톨로지로 변환하고, SPARQL 쿼리 + 동적 스키마 편집 + SHACL 검증을 제공하는 시맨틱 BIM 파이프라인
+> Navisworks CSV / IFC 파일을 RDF 온톨로지로 변환하고, SPARQL 쿼리 + 계층 탐색 + 속성 집계 + 검증을 제공하는 시맨틱 BIM 파이프라인
 
-**[Documentation Site](https://tygwan.github.io/bim-ontology/)** | **[Dashboard Guide](https://tygwan.github.io/bim-ontology/guide/)** | **[API Reference](https://tygwan.github.io/bim-ontology/api/)**
+## Overview
 
-IFC 파일(Navisworks/Smart Plant 3D 내보내기 포함)을 ifcOWL 기반 RDF 트리플로 변환하여 시맨틱 웹 기술로 건설 데이터를 탐색, 추론, 검증합니다.
+Navisworks에서 내보낸 CSV(AllHierarchy) 또는 IFC 파일을 RDF 트리플로 변환하여 시맨틱 웹 기술로 건설 데이터를 탐색, 추론, 검증합니다.
 
 ```
-IFC File → [IFCParser] → [RDFConverter] → [TripleStore] → SPARQL / REST API / Dashboard
-                                               ↓
-                                    [OWLReasoner] → Inferred triples
-                                    [SHACLValidator] → Validation report
-                                    [OntologySchemaManager] → Dynamic schema editing
+                          ┌─────────────┐
+Navisworks CSV ──────────►│             │
+  (AllHierarchy.csv)      │  navis_to_  │──► TTL (RDF)──► SPARQL API ──► Dashboard
+                          │  rdf.py     │       │
+IFC File ────────────────►│             │       ├──► OWL Reasoning
+  (nwd4op-12.ifc)        └─────────────┘       ├──► SHACL Validation
+                                                └──► Property Aggregation
 ```
 
-## Features
+### Two Data Pipelines
 
-### Core Pipeline
-- **IFC Parsing** - ifcopenshell 기반 IFC4/IFC2X3 파일 파싱
-- **RDF Conversion** - ifcOWL 네임스페이스 기반 RDF 트리플 생성
-- **Name-based Classification** - Navisworks 내보내기로 손실된 타입을 29개 카테고리로 복원
-- **SPARQL Queries** - rdflib 기반 로컬 트리플 스토어
-- **Streaming Conversion** - 배치 단위 대용량 IFC 파일 처리
+| Pipeline | Source | Output | Features |
+|----------|--------|--------|----------|
+| **CSV Pipeline** (recommended) | Navisworks AllHierarchy CSV (76MB) | navis-via-csv.ttl (282K triples) | ParentId hierarchy, SP3D properties, PropertyValue reification |
+| **IFC Pipeline** | IFC4/IFC2X3 file | nwd4op-12.ttl (39K triples) | Building hierarchy, ifcOWL triples |
 
-### Smart3D Plant Support
-- **10 Plant-specific Patterns** - MemberSystem, Hanger, PipeFitting, Flange, Nozzle 등
-- **SP3D PropertySet Detection** - Smart Plant 3D 속성 자동 태깅
-- **Property API** - 요소별 속성 조회 및 검색
+CSV Pipeline이 더 풍부한 데이터를 제공합니다 (12,009 objects, 9-level hierarchy, 414K property values).
 
-### Ontology Management (Palantir Foundry-inspired)
-- **Dynamic Schema Editing** - REST API로 Object Type, Property Type, Link Type CRUD
-- **Mutable Classification Rules** - JSON 파일 기반 분류 규칙 런타임 변경
-- **Schema Import/Export** - JSON 형식 스키마 내보내기/가져오기
+---
 
-### Inference & Validation
-- **OWL/RDFS Reasoning** - owlrl 기반 (StructuralElement, MEPElement, PipingElement, PlantSupportElement 등)
-- **SHACL Validation** - pyshacl 기반 형상 제약조건 검증
-- **Query Caching** - LRU 인메모리 캐시 (14,800x+ 속도 향상)
+## Getting Started (First-Time Users)
 
-### Infrastructure
-- **Web Dashboard** - 7탭 대시보드 (Overview, Buildings, Elements, SPARQL, Properties, Ontology, Reasoning)
-- **GraphDB Integration** - 외부 트리플스토어 어댑터 (SPARQLWrapper)
-- **Docker Support** - API + GraphDB (optional) 컨테이너
-- **CI/CD** - GitHub Actions (IFC 비의존 테스트 분리)
+### Prerequisites
 
-## Quick Start
+- **Python 3.11+**
+- **[uv](https://docs.astral.sh/uv/)** - Python package manager
 
 ```bash
-# 1. 가상환경 생성 및 패키지 설치
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 2. 서버 시작
-uvicorn src.api.server:app --reload
-
-# 3. 브라우저에서 대시보드 열기
-open http://localhost:8000
-
-# 4. 테스트 실행
-pytest tests/ -v
+# uv 설치 (아직 없다면)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Docker
+### Step 1: Clone and Install
 
 ```bash
-# API만 실행
-docker compose up --build
-
-# GraphDB 포함 실행
-docker compose --profile graphdb up --build
-
-# http://localhost:8000 (API + Dashboard)
-# http://localhost:7200 (GraphDB Workbench)
+git clone https://github.com/tygwan/bim-ontology.git
+cd bim-ontology
+uv sync
 ```
 
-## Usage
+### Step 2: Data Files
 
-### Python API
+**Data files are NOT included in git** (too large). You need to obtain them separately.
 
-```python
-from src.parser import IFCParser
-from src.converter import RDFConverter
-from src.storage import TripleStore
+Place the data files in the following locations:
 
-# 1. IFC 파싱
-parser = IFCParser("references/sample.ifc")
-parser.open()
-
-# 2. RDF 변환
-converter = RDFConverter(schema=parser.get_schema())
-graph = converter.convert_file(parser)
-
-# 3. SPARQL 쿼리
-store = TripleStore(graph)
-results = store.query("""
-    PREFIX bim: <http://example.org/bim-ontology/schema#>
-    SELECT ?cat (COUNT(?e) AS ?num)
-    WHERE { ?e bim:hasCategory ?cat }
-    GROUP BY ?cat ORDER BY DESC(?num)
-""")
-
-# 4. OWL 추론
-from src.inference.reasoner import OWLReasoner
-reasoner = OWLReasoner(store.graph)
-result = reasoner.run_all()  # StructuralElement, MEPElement, PipingElement 등 추론
-
-# 5. SHACL 검증
-from src.inference.shacl_validator import validate
-report = validate(store.graph)
-print(f"Conforms: {report['conforms']}, Violations: {report['violations_count']}")
+```
+data/rdf/
+  ├── navis-via-csv.ttl        # 16MB  - Basic (hierarchy + SP3D)
+  ├── navis-via-csv-v3.ttl     # 131MB - Full (+ 414K PropertyValues)
+  └── nwd4op-12.ttl            # 2MB   - IFC-based (optional)
+references/
+  └── AllHierarchy_*.csv       # 76MB  - Source Navisworks CSV (optional)
 ```
 
-### Python Client
+| File | Required? | Description |
+|------|-----------|-------------|
+| `navis-via-csv.ttl` | **Yes** (minimum) | Navisworks hierarchy + SP3D properties. 282K triples. |
+| `navis-via-csv-v3.ttl` | Recommended | Full data with PropertyValue reification. 2.8M triples. |
+| `nwd4op-12.ttl` | Optional | IFC-based data for Buildings tab. |
+| `AllHierarchy_*.csv` | Optional | Source CSV, only needed if you want to re-convert. |
 
-```python
-from src.clients.python import BIMOntologyClient
+### Step 3: Start the Server
 
-# 로컬 모드
-client = BIMOntologyClient.from_ifc("references/sample.ifc")
+```bash
+# Option A: Fast startup (16MB, 282K triples, ~2 min loading)
+BIM_RDF_PATH=data/rdf/navis-via-csv.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 
-# 원격 모드
-client = BIMOntologyClient.from_api("http://localhost:8000")
+# Option B: Full data (131MB, 2.8M triples, ~5 min loading)
+BIM_RDF_PATH=data/rdf/navis-via-csv-v3.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 
-stats = client.get_statistics()
-pipes = client.get_elements(category="Pipe", limit=10)
-hierarchy = client.get_hierarchy()
+# Option C: Quick test (2MB, 39K triples, ~10 sec loading)
+BIM_RDF_PATH=data/rdf/nwd4op-12.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 ```
 
-## API Endpoints
+> **Note**: The server will not respond until the TTL file is fully parsed. Wait for the "Application startup complete" message in the terminal.
 
-### Core API
+### Step 4: Open Dashboard
+
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+You should see the **BIM Ontology Dashboard** with "Connected" status and a triple count in the top-right corner.
+
+---
+
+## Dashboard Guide
+
+13-tab dashboard for exploring BIM data.
+
+### Tab Overview
+
+| Tab | Purpose | When to Use |
+|-----|---------|-------------|
+| **Overview** | Summary stats, category charts, data source selector | First stop - verify data is loaded |
+| **Buildings** | IFC building hierarchy (Project > Site > Building > Storey) | IFC data only (nwd4op-12.ttl) |
+| **Hierarchy** | System Path tree + **Navisworks Miller Columns drill-down** | **Main explorer** - navigate hierarchy, aggregate properties |
+| **Elements** | Filter/search individual BIM elements | Find specific elements by name or category |
+| **SPARQL** | Custom SPARQL query editor + templates | Advanced users - custom data analysis |
+| **Properties** | PropertySet lookup by GlobalId, property search | Inspect individual element properties |
+| **Ontology** | Schema editor - types, relations, classification rules | Modify the ontology schema |
+| **Reasoning** | OWL/RDFS inference engine | Infer implicit relationships |
+| **Validation** | Quality checks on TTL data | Data quality assurance |
+| **Explorer** | Generic RDF node browser with custom columns | Deep exploration of any node type |
+| **Lean Layer** | CSV injection (schedule, AWP, status, equipment) | Construction management data |
+| **Today's Work** | Daily work package viewer | Schedule-based planning |
+| **Status Monitor** | Delayed elements, status tracking | Progress monitoring |
+
+### Recommended First Steps
+
+1. **Overview tab** - Confirm data is loaded (check triple count and stats)
+2. **Hierarchy tab** - Click "Load" on the Navisworks Hierarchy Tree
+3. Drill down into nodes using the **Miller Columns** (click a node to see children)
+4. Select a node to see **Property Summary** (category breakdown, status distribution)
+5. Try the **SPARQL tab** with template queries
+6. Explore the **Explorer tab** to browse any RDF type
+
+### Hierarchy Tab - Miller Columns
+
+The main feature for exploring the Navisworks hierarchy:
+
+```
+[Root Column]  →  [Children]  →  [Grandchildren]  →  ...
+┌────────────┐   ┌──────────┐   ┌──────────────┐
+│ For Review │ → │ TRAINING │ → │ A1     (640) │
+│    (12008) │   │  (11859) │   │ A2    (2334) │
+│            │   │ Structure│   │ A3    (2180) │
+│            │   │    (134) │   │ ...          │
+└────────────┘   └──────────┘   └──────────────┘
+```
+
+- Click a node to see its children in the next column
+- Breadcrumb navigation at the top
+- Numbers in parentheses = total descendants
+- **Property Summary** panel shows category/status aggregation of the selected subtree
+- **Show Graph** button for canvas visualization
+
+### Data File Switching
+
+You can switch TTL files without restarting the server:
+1. **Overview tab** - Use the "Data Source" dropdown and click "Load"
+2. **Hierarchy tab** - Use the "RDF Data Source" dropdown and click "Load File"
+
+---
+
+## API Reference
+
+### Core
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Web dashboard |
-| GET | `/health` | Health check |
-| POST | `/api/sparql` | SPARQL query execution |
-| GET | `/api/buildings` | Building list |
-| GET | `/api/storeys` | Storey list |
-| GET | `/api/elements?category=Pipe` | Element list (category filter) |
+| GET | `/health` | Health check (`{"status":"healthy","triples":282704}`) |
+| POST | `/api/sparql` | SPARQL query (`{"query":"SELECT ..."}`) |
 | GET | `/api/statistics` | Overall statistics |
-| GET | `/api/hierarchy` | Building hierarchy |
+| GET | `/api/statistics/metadata` | Max level, total objects, property values |
 
-### Reasoning & Validation
+### Elements & Buildings
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/reasoning` | Run OWL/RDFS inference |
-| POST | `/api/reasoning/validate` | Run SHACL validation |
+| GET | `/api/buildings` | Building list |
+| GET | `/api/storeys` | Storey list |
+| GET | `/api/elements?category=Pipe` | Elements with filter |
+| GET | `/api/hierarchy` | Building hierarchy |
 
-### Properties (Smart3D Plant)
+### Properties
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/properties/{global_id}` | Element PropertySets |
 | GET | `/api/properties/plant-data` | SP3D data summary |
 | GET | `/api/properties/search?key=Weight` | Property search |
 
+### Reasoning & Validation
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/reasoning` | Run OWL/RDFS inference |
+| POST | `/api/reasoning/validate` | Run SHACL validation |
+| GET | `/api/reasoning/ttl-files` | List available TTL files |
+| POST | `/api/reasoning/reload?file_name=x.ttl` | Load a different TTL file |
+
 ### Ontology Editor
 | Method | Path | Description |
 |--------|------|-------------|
 | GET/POST | `/api/ontology/types` | Object Types CRUD |
-| PUT/DELETE | `/api/ontology/types/{name}` | Update/delete type |
-| GET/POST | `/api/ontology/properties` | Property Types CRUD |
 | GET/POST | `/api/ontology/links` | Link Types CRUD |
 | GET/PUT | `/api/ontology/rules` | Classification rules |
 | POST | `/api/ontology/apply` | Apply schema to graph |
-| GET | `/api/ontology/export` | Export schema (JSON) |
-| POST | `/api/ontology/import` | Import schema (JSON) |
+| GET/POST | `/api/ontology/export` / `import` | Schema JSON |
 
-## Architecture
+---
+
+## RDF Data Model
+
+### Namespaces
+
+| Prefix | URI | Usage |
+|--------|-----|-------|
+| `navis:` | `http://example.org/bim-ontology/navis#` | Navisworks hierarchy, levels, counts |
+| `sp3d:` | `http://example.org/bim-ontology/sp3d#` | Smart Plant 3D properties |
+| `bim:` | `http://example.org/bim-ontology/schema#` | BIM categories, classification |
+| `prop:` | `http://example.org/bim-ontology/property#` | PropertyValue reification (v3) |
+| `inst:` | `http://example.org/bim-ontology/instance#` | Individual node instances |
+
+### Hierarchy Predicates
+
+```turtle
+# Navisworks ParentId hierarchy
+inst:node_A navis:hasParent inst:node_B .
+inst:node_A navis:hasLevel 2 .
+inst:node_A navis:hasChildCount 7 .
+inst:node_A navis:hasDescendantCount 11859 .
+
+# System Path (logical hierarchy)
+inst:node_A sp3d:hasSystemPath "TRAINING\\A1\\Unit01" .
+```
+
+### PropertyValue Pattern (v3 only)
+
+```turtle
+inst:element_X prop:hasProperty inst:pv_123 .
+inst:pv_123 a prop:PropertyValue ;
+    prop:propertyName "DryWeight" ;
+    prop:rawValue "1250.5" ;
+    prop:dataType "Double" ;
+    prop:unit "kg" ;
+    prop:category "Piping" .
+```
+
+---
+
+## Project Structure
 
 ```
 bim-ontology/
 ├── src/
-│   ├── parser/ifc_parser.py          # IFC parsing (IFC4/IFC2X3)
-│   ├── converter/
-│   │   ├── ifc_to_rdf.py             # RDF conversion + SP3D detection
-│   │   ├── streaming_converter.py    # Large file streaming
-│   │   ├── mapping.py                # IFC → ifcOWL mappings
-│   │   └── namespace_manager.py      # BIM/SP3D/BOT namespaces
-│   ├── storage/
-│   │   ├── base_store.py             # ABC interface
-│   │   ├── triple_store.py           # rdflib local store
-│   │   └── graphdb_store.py          # GraphDB adapter
-│   ├── inference/
-│   │   ├── reasoner.py               # OWL/RDFS + 7 custom rules
-│   │   └── shacl_validator.py        # SHACL shape validation
-│   ├── ontology/
-│   │   └── schema_manager.py         # Dynamic schema CRUD
-│   ├── cache/query_cache.py          # LRU query cache
 │   ├── api/
-│   │   ├── server.py                 # FastAPI server
+│   │   ├── server.py                 # FastAPI server (env-based config)
 │   │   └── routes/                   # sparql, buildings, statistics,
 │   │                                 # reasoning, properties, ontology_editor
 │   ├── dashboard/
-│   │   ├── index.html                # 7-tab dashboard
-│   │   └── app.js                    # Dashboard logic
-│   └── clients/python/client.py      # Python client
+│   │   ├── index.html                # 13-tab dashboard
+│   │   └── app.js                    # Dashboard logic (Miller Columns, etc.)
+│   ├── converter/
+│   │   ├── navis_to_rdf.py           # CSV → RDF pipeline
+│   │   ├── ifc_to_rdf.py             # IFC → RDF pipeline
+│   │   ├── namespace_manager.py      # Namespace management
+│   │   └── mapping.py                # IFC → ifcOWL mappings
+│   ├── parser/ifc_parser.py          # IFC parsing (IFC4/IFC2X3)
+│   ├── inference/
+│   │   ├── reasoner.py               # OWL/RDFS + custom rules
+│   │   └── shacl_validator.py        # SHACL validation
+│   ├── ontology/schema_manager.py    # Dynamic schema CRUD
+│   └── storage/                      # TripleStore (rdflib / GraphDB)
 ├── data/
-│   ├── rdf/                           # Converted RDF cache (.gitignore)
-│   └── ontology/                     # SHACL shapes, rules, custom schema
-├── tests/                            # 91 tests (requires_ifc marker)
-├── docker-compose.yml                # API + GraphDB (optional)
-└── requirements.txt                  # Python dependencies
+│   ├── rdf/                          # TTL files (.gitignore)
+│   └── ontology/                     # SHACL shapes, rules
+├── references/                       # CSV, IFC, PDF (.gitignore)
+├── docs/
+│   └── DASHBOARD-GUIDE.md            # Detailed tab-by-tab guide
+├── pyproject.toml                    # Dependencies (uv)
+└── uv.lock                          # Lock file
 ```
 
-## Dashboard Guide
+## Environment Variables
 
-7탭 대시보드(`http://localhost:8000`)로 BIM 데이터를 시각적으로 탐색하고 관리합니다.
-
-| Tab | Features |
-|-----|----------|
-| **Overview** | 4개 통계 카드 (Triples, Elements, Categories, Buildings), 카테고리 도넛 차트, Top 10 바 차트 |
-| **Buildings** | 건물 계층 트리 (Project → Site → Building → Storey), 노드 클릭 시 상세 정보 |
-| **Elements** | 카테고리 필터 드롭다운, 이름 검색, 50개 단위 페이지네이션 |
-| **SPARQL** | 쿼리 에디터 + Execute 버튼, 6개 프리셋 템플릿, 결과 테이블 (행 수, 실행 시간) |
-| **Properties** | GlobalId로 PropertySet 조회, 속성 키 검색, Smart3D Plant(SP3D) 데이터 요약 |
-| **Ontology** | Object Type/Link Type CRUD, 분류 규칙 JSON 에디터, 스키마 Import/Export/Apply |
-| **Reasoning** | OWL/RDFS 추론 실행, Before/After 트리플 비교, 추론된 타입별 요소 수, SHACL 검증 |
-
-상세 가이드: [tygwan.github.io/bim-ontology/guide](https://tygwan.github.io/bim-ontology/guide/)
-
-## Classification System
-
-29 BIM element categories (order-sensitive, specific before generic):
-
-| Group | Categories |
-|-------|-----------|
-| **Smart3D Plant** | MemberSystem, Hanger, PipeFitting, Flange, ProcessUnit, Conduit, Assembly, Brace, GroutPad, Nozzle |
-| **Structural** | Slab, Wall, Column, Beam, Foundation, Structural |
-| **MEP** | Pipe, Duct, CableTray, Insulation, Valve, Pump, Equipment |
-| **Access** | Railing, Stair |
-| **Other** | Support, MemberPart, Aspect, Geometry |
-
-## Reasoning Rules
-
-| Rule | Description |
-|------|-------------|
-| `infer_structural_element` | Beam, Column, Slab, Wall, Foundation -> StructuralElement |
-| `infer_mep_element` | Pipe, Duct, CableTray, Valve, Pump, Insulation, Equipment -> MEPElement |
-| `infer_access_element` | Stair, Railing -> AccessElement |
-| `infer_plant_support_element` | Hanger, Brace, MemberSystem, Support -> PlantSupportElement |
-| `infer_piping_element` | PipeFitting, Flange, Nozzle, Valve, Pipe -> PipingElement |
-| `infer_storey_has_elements` | Storey with elements -> hasElements=true |
-| `infer_element_in_building` | Element in storey -> isInBuilding (transitive) |
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| IFC4 conversion | ~1.3s / ~39K triples |
-| IFC2X3 conversion (streaming) | ~38s / ~39K triples |
-| SPARQL cache speedup | 14,869x (65ms -> 0.004ms) |
-| OWL reasoning triple increase | +66.7% (39K -> 65K) |
-| Test coverage | 85% (91 tests) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BIM_RDF_PATH` | `data/rdf/navis-via-csv-v3.ttl` | TTL file to load on startup |
+| `BIM_IFC_PATH` | `references/nwd4op-12.ifc` | IFC file for IFC conversion features |
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| IFC Parsing | ifcopenshell 0.8.4 |
-| RDF/SPARQL | rdflib 7.5.0 |
-| OWL/RDFS Reasoning | owlrl 6.0+ |
-| SHACL Validation | pyshacl 0.26+ |
-| Web Framework | FastAPI |
-| External Triplestore | GraphDB 10.6 (optional) |
-| Testing | pytest 7.0+ |
-| Container | Docker + Docker Compose |
+| RDF/SPARQL | rdflib 7.x |
+| Web Framework | FastAPI + Uvicorn |
+| OWL Reasoning | owlrl |
+| IFC Parsing | ifcopenshell (optional) |
+| Dashboard | Vanilla JS + Tailwind CSS + Chart.js |
+| Package Manager | uv |
+
+## Troubleshooting
+
+### Server won't start
+```bash
+# Check Python version
+python3 --version  # Must be 3.11+
+
+# Reinstall dependencies
+uv sync
+
+# Check if port is in use
+lsof -i :8000
+```
+
+### Page keeps loading / "Connecting..."
+The server is still parsing the TTL file. Check the terminal for progress:
+- `nwd4op-12.ttl` (2MB): ~10 seconds
+- `navis-via-csv.ttl` (16MB): ~2 minutes
+- `navis-via-csv-v3.ttl` (131MB): ~5 minutes
+
+Wait for `Application startup complete` message.
+
+### Empty data in dashboard tabs
+- Check the **Overview tab** to verify which file is loaded
+- CSV-based files (`navis-via-csv*.ttl`) have Navisworks hierarchy data
+- IFC-based files (`nwd4op-12.ttl`) have Building hierarchy data
+- **Buildings tab** only works with IFC-based files
+- **Hierarchy tab Navisworks tree** only works with CSV-based files
+
+### SPARQL query is slow
+- Always use `LIMIT` (e.g., `LIMIT 50`)
+- Avoid `navis:hasParent*` on large subtrees (>5000 descendants)
+- Use specific predicates instead of `?s ?p ?o`
+
+### No PropertyValues in aggregation
+- PropertyValues are only in `navis-via-csv-v3.ttl` (131MB file)
+- The basic `navis-via-csv.ttl` has hierarchy and SP3D properties but not PropertyValue reification
 
 ## References
 
