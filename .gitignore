@@ -21,14 +21,21 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Large IFC files and reference papers
+# Large IFC files, reference papers, and source CSV
 references/*.ifc
 references/*.pdf
+references/*.csv
 
 # Generated RDF output
 data/rdf/*.ttl
 data/rdf/*.xml
 data/rdf/*.jsonld
+data/rdf/*.bak
+
+# Audit and test artifacts
+data/audit/*.json
+data/test/*.ifc
+data/test/*.ttl
 
 # Environment
 .env
