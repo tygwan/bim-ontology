@@ -51,8 +51,11 @@ async def _save_upload(upload: UploadFile) -> str:
 async def inject_schedule(file: UploadFile = File(...)):
     """일정 CSV를 주입한다.
 
-    CSV 컬럼: GlobalId, TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd,
-              PlannedInstallDate, DeliveryStatus, CWP_ID, UnitCost
+    CSV 컬럼:
+    - 식별자: GlobalId | ObjectId | SyncID
+    - 일정: TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd
+    - 기간/비용: Duration, PlannedDuration, ActualDuration, UnitCost, Cost
+    - 기타: PlannedInstallDate, DeliveryStatus, CWP_ID
     """
     tmp_path = await _save_upload(file)
     try:
@@ -73,8 +76,9 @@ async def inject_schedule(file: UploadFile = File(...)):
 async def inject_awp(file: UploadFile = File(...)):
     """AWP CSV를 주입한다.
 
-    CSV 컬럼: GlobalId, CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate,
-              ConstraintStatus
+    CSV 컬럼:
+    - 식별자: GlobalId | ObjectId | SyncID
+    - AWP: CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate, ConstraintStatus
     """
     tmp_path = await _save_upload(file)
     try:
@@ -95,7 +99,9 @@ async def inject_awp(file: UploadFile = File(...)):
 async def inject_status(file: UploadFile = File(...)):
     """상태 CSV를 주입한다.
 
-    CSV 컬럼: GlobalId, StatusValue, StatusDate, DeliveryStatus
+    CSV 컬럼:
+    - 식별자: GlobalId | ObjectId | SyncID
+    - 상태: StatusValue, StatusDate, DeliveryStatus
     """
     tmp_path = await _save_upload(file)
     try:

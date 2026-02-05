@@ -255,9 +255,9 @@ BIM Ontology Dashboard는 IFC → RDF 온톨로지 데이터를 시각화하고 
 
 | 타입 | CSV 컬럼 | 설명 |
 |------|----------|------|
-| Schedule | GlobalId, TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd, PlannedInstallDate, DeliveryStatus, CWP_ID, UnitCost | 일정 + 배송 상태 |
-| AWP | GlobalId, CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate, ConstraintStatus | 작업 패키지 계층 |
-| Status | GlobalId, StatusValue, StatusDate, DeliveryStatus | 요소 상태 이력 |
+| Schedule | GlobalId or ObjectId or SyncID, TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd, Duration/PlannedDuration/ActualDuration, UnitCost/Cost, PlannedInstallDate, DeliveryStatus, CWP_ID | 일정 + 비용/소요일 + 배송 상태 |
+| AWP | GlobalId or ObjectId or SyncID, CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate, ConstraintStatus | 작업 패키지 계층 |
+| Status | GlobalId or ObjectId or SyncID, StatusValue, StatusDate, DeliveryStatus | 요소 상태 이력 |
 | Equipment | EquipmentID, Name, Width, Height, TurningRadius, BoomLength, LoadCapacity, AccessZone_CWA_ID | 장비 사양 |
 
 ### 사용법
@@ -269,10 +269,16 @@ BIM Ontology Dashboard는 IFC → RDF 온톨로지 데이터를 시각화하고 
 
 ### Lean Layer Summary
 - CWA/CWP/IWP 수, 상태 보유 요소 수, IWP 할당 요소 수 등
+- Cost/Duration KPI:
+  - Elements with Unit Cost, Elements with Consume Duration
+  - Tasks with Typed Duration vs Legacy Duration
+  - Total/Avg Unit Cost, Avg Consume Duration, Avg Effective Task Duration
+- Duration 우선순위(Effective Task Duration):
+  - `ActualDuration` → `PlannedDuration` → `Duration(legacy 문자열, 숫자형일 때만)`
 
 ### 참고
-- GlobalId가 RDF에 존재하는 요소만 매칭됩니다
-- 존재하지 않는 GlobalId는 무시됩니다
+- GlobalId, ObjectId, SyncID 중 RDF에 존재하는 식별자로 매칭됩니다
+- 존재하지 않는 식별자는 무시됩니다
 - 주입 시 lean_schema.ttl이 자동 로딩됩니다
 
 ---

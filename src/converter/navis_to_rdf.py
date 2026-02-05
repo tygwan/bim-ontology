@@ -68,6 +68,30 @@ class NavisToRDFConverter:
         "Nozzle": ["Nozzle", "STNoz"],
     }
 
+    @staticmethod
+    def _parse_int_like(value: str) -> Optional[int]:
+        """정수/실수 문자열을 정수로 파싱한다."""
+        text = (value or "").strip()
+        if not text:
+            return None
+        text = text.replace(",", "")
+        try:
+            return int(float(text))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _parse_float_like(value: str) -> Optional[float]:
+        """숫자 문자열을 실수로 파싱한다."""
+        text = (value or "").strip()
+        if not text:
+            return None
+        text = text.replace(",", "")
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
     def __init__(self):
         self.graph = Graph()
         self._bind_namespaces()
@@ -151,6 +175,19 @@ class NavisToRDFConverter:
         for name, (prop, _) in self.SP3D_PROPERTY_MAP.items():
             self.graph.add((prop, RDF.type, OWL.DatatypeProperty))
             self.graph.add((prop, RDFS.label, Literal(f"SP3D {name}")))
+
+        # Lean/Schedule 확장 프로퍼티 (CSV 확장 컬럼 대응)
+        schedule_props = [
+            (SCHED.hasDuration, "Task Duration (legacy string)"),
+            (SCHED.hasPlannedDuration, "Task Planned Duration (days)"),
+            (SCHED.hasActualDuration, "Task Actual Duration (days)"),
+            (SCHED.hasCost, "Task Cost"),
+            (BIM.hasConsumeDuration, "Element Consume Duration (days)"),
+            (BIM.hasUnitCost, "Element Unit Cost"),
+        ]
+        for prop, label in schedule_props:
+            self.graph.add((prop, RDF.type, OWL.DatatypeProperty))
+            self.graph.add((prop, RDFS.label, Literal(label)))
 
         # Property-Value 패턴용 스키마 (모든 CSV 속성 저장)
         self.graph.add((PROP.PropertyValue, RDF.type, OWL.Class))
@@ -520,6 +557,8 @@ class NavisToRDFConverter:
         stats = {
             "total_tasks": 0,
             "matched_elements": 0,
+            "tasks_with_cost": 0,
+            "tasks_with_duration": 0,
             "triples_added": 0,
         }
 
@@ -536,6 +575,14 @@ class NavisToRDFConverter:
                 task_type = row.get("TaskType", "").strip()
                 parent_set = row.get("ParentSet", "").strip()
                 progress = row.get("Progress", "0").strip()
+                planned_duration_raw = row.get("PlannedDuration", "").strip()
+                if not planned_duration_raw:
+                    planned_duration_raw = row.get("Duration", "").strip()
+                actual_duration_raw = row.get("ActualDuration", "").strip()
+                cost_raw = row.get("Cost", "").strip() or row.get("UnitCost", "").strip()
+                planned_duration_days = self._parse_int_like(planned_duration_raw)
+                actual_duration_days = self._parse_int_like(actual_duration_raw)
+                cost_value = self._parse_float_like(cost_raw)
 
                 if not sync_id or not task_name:
                     continue
@@ -561,13 +608,33 @@ class NavisToRDFConverter:
                 if parent_set:
                     self.graph.add((task_uri, SCHED.hasParentSet, Literal(parent_set)))
                 if progress:
-                    self.graph.add((task_uri, SCHED.hasProgress, Literal(float(progress), datatype=XSD.double)))
+                    try:
+                        self.graph.add((task_uri, SCHED.hasProgress, Literal(float(progress), datatype=XSD.double)))
+                    except ValueError:
+                        logger.warning("Invalid progress value skipped: %s", progress)
+
+                # Duration/Cost 확장 컬럼 주입
+                if planned_duration_raw:
+                    self.graph.add((task_uri, SCHED.hasDuration, Literal(planned_duration_raw, datatype=XSD.string)))
+                    stats["tasks_with_duration"] += 1
+                if planned_duration_days is not None:
+                    self.graph.add((task_uri, SCHED.hasPlannedDuration, Literal(planned_duration_days, datatype=XSD.integer)))
+                if actual_duration_days is not None:
+                    self.graph.add((task_uri, SCHED.hasActualDuration, Literal(actual_duration_days, datatype=XSD.integer)))
+                if cost_value is not None:
+                    self.graph.add((task_uri, SCHED.hasCost, Literal(cost_value, datatype=XSD.double)))
+                    stats["tasks_with_cost"] += 1
 
                 # SyncID로 요소 매칭 (dxtnavis에서 SyncID는 ObjectId와 매칭될 수 있음)
                 if sync_id in self._object_cache:
                     elem_uri = self._object_cache[sync_id]
                     self.graph.add((elem_uri, SCHED.assignedToTask, task_uri))
                     self.graph.add((task_uri, SCHED.hasAssignedElement, elem_uri))
+                    if cost_value is not None:
+                        self.graph.add((elem_uri, BIM.hasUnitCost, Literal(cost_value, datatype=XSD.double)))
+                    consume_days = actual_duration_days if actual_duration_days is not None else planned_duration_days
+                    if consume_days is not None:
+                        self.graph.add((elem_uri, BIM.hasConsumeDuration, Literal(consume_days, datatype=XSD.integer)))
                     stats["matched_elements"] += 1
 
         stats["triples_added"] = len(self.graph) - initial_triples

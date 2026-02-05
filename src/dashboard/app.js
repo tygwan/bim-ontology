@@ -164,6 +164,16 @@ function formatNumber(n) {
     return n.toLocaleString();
 }
 
+function formatDecimal(n, digits = 2) {
+    if (n == null) return '--';
+    const num = Number(n);
+    if (!Number.isFinite(num)) return '--';
+    return num.toLocaleString(undefined, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+    });
+}
+
 function coerceInt(value) {
     const n = parseInt(value, 10);
     return Number.isFinite(n) ? n : null;
@@ -1538,6 +1548,15 @@ async function loadLeanStats() {
             <tr><td class="text-gray-400">Equipment</td><td class="text-right">${formatNumber(data.equipment)}</td></tr>
             <tr><td class="text-gray-400">With Delivery Status</td><td class="text-right">${formatNumber(data.with_delivery)}</td></tr>
             <tr><td class="text-gray-400">Assigned to IWP</td><td class="text-right">${formatNumber(data.with_iwp)}</td></tr>
+            <tr><td class="text-gray-400">Elements with Unit Cost</td><td class="text-right">${formatNumber(data.with_unit_cost)}</td></tr>
+            <tr><td class="text-gray-400">Elements with Consume Duration</td><td class="text-right">${formatNumber(data.with_consume_duration)}</td></tr>
+            <tr><td class="text-gray-400">Tasks with Cost</td><td class="text-right">${formatNumber(data.tasks_with_cost)}</td></tr>
+            <tr><td class="text-gray-400">Tasks with Typed Duration</td><td class="text-right">${formatNumber(data.tasks_with_typed_duration)}</td></tr>
+            <tr><td class="text-gray-400">Tasks with Legacy Duration</td><td class="text-right">${formatNumber(data.tasks_with_legacy_duration)}</td></tr>
+            <tr><td class="text-gray-400">Total Unit Cost</td><td class="text-right">${formatDecimal(data.total_unit_cost)}</td></tr>
+            <tr><td class="text-gray-400">Avg Unit Cost</td><td class="text-right">${formatDecimal(data.avg_unit_cost)}</td></tr>
+            <tr><td class="text-gray-400">Avg Consume Duration (days)</td><td class="text-right">${formatDecimal(data.avg_consume_duration)}</td></tr>
+            <tr><td class="text-gray-400">Avg Effective Task Duration (days)</td><td class="text-right">${formatDecimal(data.avg_task_duration_effective)}</td></tr>
         </tbody></table>
     `;
 }

@@ -45,7 +45,23 @@ sched:hasActualEnd a owl:DatatypeProperty ;
 sched:hasDuration a owl:DatatypeProperty ;
     rdfs:domain sched:ConstructionTask ;
     rdfs:range xsd:string ;
-    rdfs:label "Duration (ISO 8601)" .
+    rdfs:label "Duration (legacy string)" ;
+    rdfs:comment "Backward-compatible duration string from legacy CSV." .
+
+sched:hasPlannedDuration a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:integer ;
+    rdfs:label "Planned Duration (days)" .
+
+sched:hasActualDuration a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:integer ;
+    rdfs:label "Actual Duration (days)" .
+
+sched:hasCost a owl:DatatypeProperty ;
+    rdfs:domain sched:ConstructionTask ;
+    rdfs:range xsd:double ;
+    rdfs:label "Task Cost" .
 
 sched:hasPlannedInstallDate a owl:DatatypeProperty ;
     rdfs:domain bim:PhysicalElement ;
@@ -118,6 +134,11 @@ bim:hasUnitCost a owl:DatatypeProperty ;
     rdfs:domain bim:PhysicalElement ;
     rdfs:range xsd:double ;
     rdfs:label "Unit Cost" .
+
+bim:hasConsumeDuration a owl:DatatypeProperty ;
+    rdfs:domain bim:PhysicalElement ;
+    rdfs:range xsd:integer ;
+    rdfs:label "Consume Duration (days)" .
 
 # ===== AWP (Advanced Work Packaging) Ontology =====
 

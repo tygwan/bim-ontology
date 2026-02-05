@@ -29,6 +29,15 @@ SELECT ?elem WHERE {{
 LIMIT 1
 """
 
+# ObjectId/SyncID → 요소 URI 매핑 SPARQL
+_FIND_ELEMENT_BY_OBJECTID = """
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+SELECT ?elem WHERE {{
+    ?elem navis:hasObjectId "{object_id}" .
+}}
+LIMIT 1
+"""
+
 # 값 타입 매핑
 _TYPE_MAP = {
     "string": XSD.string,
@@ -49,6 +58,7 @@ class LeanLayerInjector:
     def __init__(self, graph: Graph):
         self._graph = graph
         self._globalid_cache: dict[str, URIRef] = {}
+        self._objectid_cache: dict[str, URIRef] = {}
         self._schema_loaded = False
 
     def load_lean_schema(self, schema_path: str | None = None) -> int:
@@ -68,18 +78,59 @@ class LeanLayerInjector:
         logger.info("Lean Layer 스키마 로딩: +%d triples from %s", added, path.name)
         return added
 
-    def _resolve_element(self, global_id: str) -> Optional[URIRef]:
-        """GlobalId로 RDF 그래프에서 요소 URI를 찾는다."""
-        if global_id in self._globalid_cache:
-            return self._globalid_cache[global_id]
+    def _resolve_element(self, global_id: str = "", object_id: str = "") -> Optional[URIRef]:
+        """GlobalId 또는 ObjectId/SyncID로 RDF 그래프에서 요소 URI를 찾는다."""
+        if global_id:
+            if global_id in self._globalid_cache:
+                return self._globalid_cache[global_id]
 
-        query = _FIND_ELEMENT_BY_GLOBALID.format(global_id=global_id)
-        results = list(self._graph.query(query))
-        if results:
-            uri = results[0].elem
-            self._globalid_cache[global_id] = uri
-            return uri
+            query = _FIND_ELEMENT_BY_GLOBALID.format(global_id=global_id)
+            results = list(self._graph.query(query))
+            if results:
+                uri = results[0].elem
+                self._globalid_cache[global_id] = uri
+                return uri
+
+        if object_id:
+            if object_id in self._objectid_cache:
+                return self._objectid_cache[object_id]
+
+            query = _FIND_ELEMENT_BY_OBJECTID.format(object_id=object_id)
+            results = list(self._graph.query(query))
+            if results:
+                uri = results[0].elem
+                self._objectid_cache[object_id] = uri
+                return uri
+
         return None
+
+    @staticmethod
+    def _extract_row_ids(row: dict) -> tuple[str, str]:
+        """CSV 행에서 식별자를 추출한다.
+
+        우선순위:
+        - GlobalId: IFC 경로 호환
+        - ObjectId 또는 SyncID: Navis CSV 경로
+        """
+        global_id = row.get("GlobalId", "").strip()
+        object_id = row.get("ObjectId", "").strip()
+        if not object_id:
+            object_id = row.get("SyncID", "").strip()
+        return global_id, object_id
+
+    @staticmethod
+    def _parse_duration_days(value: str) -> Optional[int]:
+        """Duration 문자열을 일(day) 정수로 파싱한다.
+
+        숫자 문자열(`7`, `7.0`)만 지원한다.
+        """
+        text = (value or "").strip()
+        if not text:
+            return None
+        try:
+            return int(float(text))
+        except ValueError:
+            return None
 
     def _read_csv(self, csv_path: str) -> list[dict]:
         """CSV 파일을 읽어 딕셔너리 리스트로 반환한다."""
@@ -94,7 +145,10 @@ class LeanLayerInjector:
     def inject_schedule_csv(self, csv_path: str) -> dict:
         """일정 CSV를 주입한다. ConstructionTask 인스턴스를 생성하고 요소와 연결한다.
 
-        CSV 컬럼: GlobalId, TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd
+        CSV 컬럼:
+        - 식별자: GlobalId | ObjectId | SyncID
+        - 일정: TaskName, PlannedStart, PlannedEnd, ActualStart, ActualEnd
+        - 기간/비용: Duration, PlannedDuration, ActualDuration, UnitCost, Cost
         """
         rows = self._read_csv(csv_path)
         g = self._graph
@@ -104,17 +158,21 @@ class LeanLayerInjector:
         not_found = []
 
         for row in rows:
-            global_id = row.get("GlobalId", "").strip()
+            global_id, object_id = self._extract_row_ids(row)
             task_name = row.get("TaskName", "").strip()
-            if not global_id:
+            if not global_id and not object_id:
                 continue
 
-            elem_uri = self._resolve_element(global_id)
+            elem_uri = self._resolve_element(global_id=global_id, object_id=object_id)
             if elem_uri is None:
-                not_found.append(global_id)
+                not_found.append(global_id or object_id)
                 continue
 
             elements_matched += 1
+            planned_duration_raw = row.get("PlannedDuration", "").strip() or row.get("Duration", "").strip()
+            actual_duration_raw = row.get("ActualDuration", "").strip()
+            planned_duration_days = self._parse_duration_days(planned_duration_raw)
+            actual_duration_days = self._parse_duration_days(actual_duration_raw)
 
             # Task 인스턴스 생성 (같은 TaskName은 하나의 Task로)
             if task_name and task_name not in tasks_created:
@@ -129,12 +187,23 @@ class LeanLayerInjector:
                     ("PlannedEnd", SCHED.hasPlannedEnd, XSD.date),
                     ("ActualStart", SCHED.hasActualStart, XSD.date),
                     ("ActualEnd", SCHED.hasActualEnd, XSD.date),
-                    ("Duration", SCHED.hasDuration, XSD.string),
                 ]:
                     val = row.get(col, "").strip()
                     if val:
                         g.add((task_uri, prop, Literal(val, datatype=dtype)))
                         triples_added += 1
+
+                # Legacy duration (문자열) 유지
+                if planned_duration_raw:
+                    g.add((task_uri, SCHED.hasDuration, Literal(planned_duration_raw, datatype=XSD.string)))
+                    triples_added += 1
+                # 타입형 duration 추가
+                if planned_duration_days is not None:
+                    g.add((task_uri, SCHED.hasPlannedDuration, Literal(planned_duration_days, datatype=XSD.integer)))
+                    triples_added += 1
+                if actual_duration_days is not None:
+                    g.add((task_uri, SCHED.hasActualDuration, Literal(actual_duration_days, datatype=XSD.integer)))
+                    triples_added += 1
 
                 tasks_created[task_name] = task_uri
 
@@ -151,13 +220,23 @@ class LeanLayerInjector:
                 ("DeliveryStatus", BIM.hasDeliveryStatus, XSD.string),
                 ("CWP_ID", AWP.belongsToCWP_ID, XSD.string),
                 ("UnitCost", BIM.hasUnitCost, XSD.double),
+                ("Cost", BIM.hasUnitCost, XSD.double),
             ]:
                 val = row.get(col, "").strip()
                 if val:
-                    if dtype == XSD.double:
-                        val = float(val)
-                    g.add((elem_uri, prop, Literal(val, datatype=dtype)))
-                    triples_added += 1
+                    try:
+                        if dtype == XSD.double:
+                            val = float(val)
+                        g.add((elem_uri, prop, Literal(val, datatype=dtype)))
+                        triples_added += 1
+                    except ValueError:
+                        logger.warning("Invalid numeric value skipped: %s=%s", col, val)
+
+            # ObjectId별 consume duration 저장 (Actual 우선, 없으면 Planned)
+            consume_days = actual_duration_days if actual_duration_days is not None else planned_duration_days
+            if consume_days is not None:
+                g.add((elem_uri, BIM.hasConsumeDuration, Literal(consume_days, datatype=XSD.integer)))
+                triples_added += 1
 
         result = {
             "triples_added": triples_added,
@@ -173,8 +252,9 @@ class LeanLayerInjector:
     def inject_awp_csv(self, csv_path: str) -> dict:
         """AWP CSV를 주입한다. CWA/CWP/IWP 계층을 구축하고 요소를 연결한다.
 
-        CSV 컬럼: GlobalId, CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate,
-                  ConstraintStatus
+        CSV 컬럼:
+        - 식별자: GlobalId | ObjectId | SyncID
+        - AWP: CWA_ID, CWP_ID, IWP_ID, IWP_StartDate, IWP_EndDate, ConstraintStatus
         """
         rows = self._read_csv(csv_path)
         g = self._graph
@@ -185,15 +265,15 @@ class LeanLayerInjector:
         elements_matched = 0
 
         for row in rows:
-            global_id = row.get("GlobalId", "").strip()
+            global_id, object_id = self._extract_row_ids(row)
             cwa_id = row.get("CWA_ID", "").strip()
             cwp_id = row.get("CWP_ID", "").strip()
             iwp_id = row.get("IWP_ID", "").strip()
 
-            if not global_id:
+            if not global_id and not object_id:
                 continue
 
-            elem_uri = self._resolve_element(global_id)
+            elem_uri = self._resolve_element(global_id=global_id, object_id=object_id)
             if elem_uri is None:
                 continue
 
@@ -265,7 +345,9 @@ class LeanLayerInjector:
     def inject_status_csv(self, csv_path: str) -> dict:
         """상태 CSV를 주입한다. ElementStatus 인스턴스를 생성한다.
 
-        CSV 컬럼: GlobalId, StatusValue, StatusDate, DeliveryStatus
+        CSV 컬럼:
+        - 식별자: GlobalId | ObjectId | SyncID
+        - 상태: StatusValue, StatusDate, DeliveryStatus
         """
         rows = self._read_csv(csv_path)
         g = self._graph
@@ -274,13 +356,13 @@ class LeanLayerInjector:
         not_found = []
 
         for i, row in enumerate(rows):
-            global_id = row.get("GlobalId", "").strip()
-            if not global_id:
+            global_id, object_id = self._extract_row_ids(row)
+            if not global_id and not object_id:
                 continue
 
-            elem_uri = self._resolve_element(global_id)
+            elem_uri = self._resolve_element(global_id=global_id, object_id=object_id)
             if elem_uri is None:
-                not_found.append(global_id)
+                not_found.append(global_id or object_id)
                 continue
 
             elements_matched += 1
@@ -289,7 +371,8 @@ class LeanLayerInjector:
             status_value = row.get("StatusValue", "").strip()
             status_date = row.get("StatusDate", "").strip()
             if status_value:
-                status_uri = INST[f"status_{global_id.replace('$', '_')}_{i}"]
+                status_seed = (global_id or object_id).replace("$", "_").replace("-", "_")
+                status_uri = INST[f"status_{status_seed}_{i}"]
                 g.add((status_uri, RDF.type, BIM.ElementStatus))
                 g.add((status_uri, BIM.hasStatusValue, Literal(status_value)))
                 g.add((elem_uri, BIM.hasStatus, status_uri))
@@ -426,14 +509,68 @@ class LeanLayerInjector:
             "equipment": "SELECT (COUNT(?e) AS ?cnt) WHERE { ?e a bim:ConstructionEquipment }",
             "with_delivery": "SELECT (COUNT(?e) AS ?cnt) WHERE { ?e bim:hasDeliveryStatus ?s }",
             "with_iwp": "SELECT (COUNT(?e) AS ?cnt) WHERE { ?e awp:assignedToIWP ?i }",
+            "with_unit_cost": "SELECT (COUNT(DISTINCT ?e) AS ?cnt) WHERE { ?e bim:hasUnitCost ?c }",
+            "with_consume_duration": "SELECT (COUNT(DISTINCT ?e) AS ?cnt) WHERE { ?e bim:hasConsumeDuration ?d }",
+            "tasks_with_cost": "SELECT (COUNT(DISTINCT ?t) AS ?cnt) WHERE { ?t a sched:ConstructionTask ; sched:hasCost ?c }",
+            "tasks_with_typed_duration": """
+                SELECT (COUNT(DISTINCT ?t) AS ?cnt) WHERE {
+                    ?t a sched:ConstructionTask .
+                    { ?t sched:hasPlannedDuration ?d }
+                    UNION
+                    { ?t sched:hasActualDuration ?d }
+                }
+            """,
+            "tasks_with_legacy_duration": "SELECT (COUNT(DISTINCT ?t) AS ?cnt) WHERE { ?t a sched:ConstructionTask ; sched:hasDuration ?d }",
+            "total_unit_cost": "SELECT (SUM(xsd:double(?c)) AS ?cnt) WHERE { ?e bim:hasUnitCost ?c }",
+            "avg_unit_cost": "SELECT (AVG(xsd:double(?c)) AS ?cnt) WHERE { ?e bim:hasUnitCost ?c }",
+            "avg_consume_duration": "SELECT (AVG(xsd:double(?d)) AS ?cnt) WHERE { ?e bim:hasConsumeDuration ?d }",
+            # 우선순위: ActualDuration > PlannedDuration > legacy Duration(숫자 문자열)
+            "avg_task_duration_effective": """
+                SELECT (AVG(?effective) AS ?cnt) WHERE {
+                    ?t a sched:ConstructionTask .
+                    OPTIONAL { ?t sched:hasActualDuration ?actualDur }
+                    OPTIONAL { ?t sched:hasPlannedDuration ?plannedDur }
+                    OPTIONAL { ?t sched:hasDuration ?legacyDur }
+                    BIND(
+                        COALESCE(
+                            xsd:double(?actualDur),
+                            xsd:double(?plannedDur),
+                            IF(
+                                REGEX(STR(?legacyDur), "^[0-9]+(\\\\.[0-9]+)?$"),
+                                xsd:double(?legacyDur),
+                                0
+                            )
+                        ) AS ?effective
+                    )
+                    FILTER(?effective > 0)
+                }
+            """,
         }
         prefixes = """
         PREFIX bim: <http://example.org/bim-ontology/schema#>
         PREFIX sched: <http://example.org/bim-ontology/schedule#>
         PREFIX awp: <http://example.org/bim-ontology/awp#>
+        PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
         """
         stats = {}
+        float_keys = {"total_unit_cost", "avg_unit_cost", "avg_consume_duration", "avg_task_duration_effective"}
         for key, q in queries.items():
             results = list(g.query(prefixes + q))
-            stats[key] = int(results[0].cnt) if results else 0
+            if not results:
+                stats[key] = 0.0 if key in float_keys else 0
+                continue
+            val = results[0].cnt
+            if val is None:
+                stats[key] = 0.0 if key in float_keys else 0
+                continue
+            if key in float_keys:
+                try:
+                    stats[key] = float(val)
+                except (TypeError, ValueError):
+                    stats[key] = 0.0
+            else:
+                try:
+                    stats[key] = int(val)
+                except (TypeError, ValueError):
+                    stats[key] = 0
         return stats
