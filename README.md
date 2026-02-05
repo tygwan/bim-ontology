@@ -47,6 +47,8 @@ cd bim-ontology
 uv sync
 ```
 
+> `uv sync`은 자동으로 `.venv/` 가상환경을 생성하고 의존성을 설치합니다. 이후 모든 명령어는 `uv run`을 통해 실행하면 가상환경이 자동 활성화됩니다. 직접 활성화하려면 `source .venv/bin/activate`를 사용하세요.
+
 ### Step 2: Data Files
 
 **Data files are NOT included in git** (too large). You need to obtain them separately.
