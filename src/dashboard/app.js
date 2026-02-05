@@ -7,7 +7,7 @@ let currentPage = 0;
 const PAGE_SIZE = 50;
 let categoryChart = null;
 let barChart = null;
-const DEFAULT_MAX_LEVEL = 5;
+const DEFAULT_MAX_LEVEL = 10;
 const SYSTEM_DEPTH_LABELS = { 1: 'Project', 2: 'Area', 3: 'Unit', 4: 'System' };
 let metadataCache = { maxLevel: null, totalObjects: null, totalProps: null };
 const tabState = {};
@@ -2436,6 +2436,45 @@ SELECT ?name ?level ?children ?descendants WHERE {
         });
         html += '</tbody></table>';
     }
+
+    // PropertyValue section for the selected node
+    const pvQuery = `
+PREFIX prop: <http://example.org/bim-ontology/property#>
+SELECT ?category ?propName ?rawValue ?dataType ?unit WHERE {
+    <${nodeUri}> prop:hasProperty ?pv .
+    ?pv prop:propertyName ?propName ; prop:rawValue ?rawValue .
+    OPTIONAL { ?pv prop:category ?category }
+    OPTIONAL { ?pv prop:dataType ?dataType }
+    OPTIONAL { ?pv prop:unit ?unit }
+} ORDER BY ?category ?propName`;
+
+    const pvData = await apiPost('/api/sparql', { query: pvQuery });
+
+    if (pvData?.results?.length) {
+        const cats = {};
+        pvData.results.forEach(r => {
+            const cat = r.category || 'Other';
+            if (!cats[cat]) cats[cat] = [];
+            cats[cat].push(r);
+        });
+
+        html += '<h5 class="text-xs text-gray-400 mt-4 mb-2">PropertyValues (' + pvData.results.length + ' properties)</h5>';
+        Object.entries(cats).forEach(([cat, props]) => {
+            const catId = 'pv-cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+            html += `<details class="mb-2" open><summary class="cursor-pointer text-sm font-semibold text-blue-300">${cat} (${props.length})</summary>`;
+            html += '<table class="mt-1"><thead><tr><th>Property</th><th>Value</th><th>Type</th><th>Unit</th></tr></thead><tbody>';
+            props.forEach(p => {
+                html += `<tr><td class="text-xs">${p.propName}</td>
+                    <td class="text-xs text-green-400">${p.rawValue || '-'}</td>
+                    <td class="text-xs text-gray-400">${p.dataType || '-'}</td>
+                    <td class="text-xs text-gray-400">${p.unit || '-'}</td></tr>`;
+            });
+            html += '</tbody></table></details>';
+        });
+    } else {
+        html += '<p class="text-xs text-gray-500 mt-4">No PropertyValues for this node. (PropertyValues require navis-via-csv-v3.ttl)</p>';
+    }
+
     container.innerHTML = html;
 }
 
@@ -2506,13 +2545,46 @@ SELECT ?status (COUNT(?obj) as ?count) WHERE {
         html += '</div></div>';
     }
 
-    // 3) PropertyValue pattern aggregation (v3 file only)
+    // 3) Numeric PropertyValue aggregation (direct children only, for performance)
+    const numericQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX prop: <http://example.org/bim-ontology/property#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?propName (SUM(xsd:double(?rawValue)) as ?total) (AVG(xsd:double(?rawValue)) as ?avg) (COUNT(?pv) as ?cnt) (SAMPLE(?unit) as ?sampleUnit) WHERE {
+    ?child navis:hasParent <${navisSelectedUri}> .
+    ?child prop:hasProperty ?pv .
+    ?pv prop:propertyName ?propName ; prop:rawValue ?rawValue ; prop:dataType "Double" .
+    OPTIONAL { ?pv prop:unit ?unit }
+    VALUES ?propName { "Dry Weight" "Area" "Length" "Width" "Volume" "Design Max Pressure" "Design Max Temperature" "Nominal Diameter" }
+} GROUP BY ?propName ORDER BY ?propName`;
+
+    const numericData = await apiPost('/api/sparql', { query: numericQuery });
+
+    if (numericData?.results?.length) {
+        html += '<h5 class="text-xs text-gray-400 mb-2">Numeric Aggregation (Direct Children)</h5>';
+        html += '<div class="grid grid-cols-2 gap-2">';
+        numericData.results.forEach(r => {
+            const total = parseFloat(r.total);
+            const avg = parseFloat(r.avg);
+            const cnt = parseInt(r.cnt) || 0;
+            const unit = r.sampleUnit || '';
+            const fmtTotal = isNaN(total) ? '-' : total.toLocaleString(undefined, {maximumFractionDigits: 2});
+            const fmtAvg = isNaN(avg) ? '-' : avg.toLocaleString(undefined, {maximumFractionDigits: 2});
+            html += `<div class="card p-2">
+                <div class="text-xs text-gray-400">${r.propName} ${unit ? '(' + unit + ')' : ''}</div>
+                <div class="text-sm font-bold text-green-400">SUM: ${fmtTotal}</div>
+                <div class="text-xs text-blue-300">AVG: ${fmtAvg} | Count: ${cnt}</div></div>`;
+        });
+        html += '</div>';
+    }
+
+    // 4) PropertyValue pattern summary by category (v3 file only)
     const propQuery = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
 PREFIX prop: <http://example.org/bim-ontology/property#>
 SELECT ?category ?propName (COUNT(?pv) as ?count) (SAMPLE(?raw) as ?sampleValue) WHERE {
-    ?obj navis:hasParent* <${navisSelectedUri}> .
-    ?obj prop:hasProperty ?pv .
+    ?child navis:hasParent <${navisSelectedUri}> .
+    ?child prop:hasProperty ?pv .
     ?pv prop:propertyName ?propName .
     ?pv prop:rawValue ?raw .
     OPTIONAL { ?pv prop:category ?category }
@@ -2528,17 +2600,15 @@ SELECT ?category ?propName (COUNT(?pv) as ?count) (SAMPLE(?raw) as ?sampleValue)
             categories[cat].push({ name: r.propName, count: parseInt(r.count) || 0, sample: r.sampleValue });
         });
 
-        html += '<h5 class="text-xs text-gray-400 mb-2">Property Values (Reified)</h5>';
-        html += '<div class="grid grid-cols-2 gap-4">';
+        html += '<h5 class="text-xs text-gray-400 mt-3 mb-2">Property Values by Category (Direct Children)</h5>';
         Object.entries(categories).forEach(([cat, props]) => {
-            html += `<div class="card"><div class="card-header text-xs">${cat}</div><div class="card-body">`;
-            html += '<table><thead><tr><th>Property</th><th>Count</th><th>Sample</th></tr></thead><tbody>';
+            html += `<details class="mb-2"><summary class="cursor-pointer text-sm font-semibold text-blue-300">${cat} (${props.length} properties)</summary>`;
+            html += '<table class="mt-1"><thead><tr><th>Property</th><th>Count</th><th>Sample</th></tr></thead><tbody>';
             props.forEach(p => {
                 html += `<tr><td class="text-xs">${p.name}</td><td class="text-right">${p.count}</td><td class="text-xs text-green-400">${p.sample || '-'}</td></tr>`;
             });
-            html += '</tbody></table></div></div>';
+            html += '</tbody></table></details>';
         });
-        html += '</div>';
     }
 
     if (!html) {
@@ -2655,7 +2725,10 @@ function renderNavisGraph() {
     });
 }
 
-function initHierarchyTab() {
+async function initHierarchyTab() {
+    if (!metadataCache.maxLevel) {
+        await loadMaxLevel();
+    }
     updateDepthSelectors(metadataCache.maxLevel);
     loadHierarchyFiles();
     loadHierarchyComparison();
