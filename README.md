@@ -72,13 +72,17 @@ references/
 ### Step 3: Start the Server
 
 ```bash
-# Option A: Fast startup (16MB, 282K triples, ~2 min loading)
+# 기본 실행 (default: navis-via-csv-v3.ttl)
+uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
+```
+
+다른 데이터 파일을 사용하려면 `BIM_RDF_PATH` 환경변수를 지정합니다:
+
+```bash
+# 빠른 시작 (16MB, 282K triples, ~2분)
 BIM_RDF_PATH=data/rdf/navis-via-csv.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 
-# Option B: Full data (131MB, 2.8M triples, ~5 min loading)
-BIM_RDF_PATH=data/rdf/navis-via-csv-v3.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
-
-# Option C: Quick test (2MB, 39K triples, ~10 sec loading)
+# 빠른 테스트 (2MB, 39K triples, ~10초)
 BIM_RDF_PATH=data/rdf/nwd4op-12.ttl uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 ```
 
