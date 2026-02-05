@@ -1482,24 +1482,16 @@ async function updateElementStatus() {
 async function loadHierarchyComparison() {
     const container = document.getElementById('hierarchy-comparison');
 
-    // Query hierarchy stats
+    // Optimized query - simple type count
     const statsQuery = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
-PREFIX bim: <http://example.org/bim-ontology/schema#>
 
-SELECT
-    (COUNT(DISTINCT ?proj) AS ?projects)
-    (COUNT(DISTINCT ?area) AS ?areas)
-    (COUNT(DISTINCT ?unit) AS ?units)
-    (COUNT(DISTINCT ?sys) AS ?systems)
-    (COUNT(DISTINCT ?elem) AS ?elements)
+SELECT ?type (COUNT(?s) AS ?count)
 WHERE {
-    OPTIONAL { ?proj a navis:Project }
-    OPTIONAL { ?area a navis:Area }
-    OPTIONAL { ?unit a navis:Unit }
-    OPTIONAL { ?sys a navis:System }
-    OPTIONAL { ?elem a navis:SP3DEntity }
-}`;
+    ?s a ?type .
+    FILTER(?type IN (navis:Project, navis:Area, navis:Unit, navis:System, navis:SP3DEntity))
+}
+GROUP BY ?type`;
 
     const data = await apiPost('/api/sparql', { query: statsQuery });
 
@@ -1508,7 +1500,17 @@ WHERE {
         return;
     }
 
-    const stats = data.results[0];
+    // Parse type counts from results
+    const stats = { projects: 0, areas: 0, units: 0, systems: 0, elements: 0 };
+    data.results.forEach(row => {
+        const typeName = (row.type || '').split('#').pop();
+        const count = parseInt(row.count) || 0;
+        if (typeName === 'Project') stats.projects = count;
+        else if (typeName === 'Area') stats.areas = count;
+        else if (typeName === 'Unit') stats.units = count;
+        else if (typeName === 'System') stats.systems = count;
+        else if (typeName === 'SP3DEntity') stats.elements = count;
+    });
 
     container.innerHTML = `
         <div class="mb-4">
@@ -1540,21 +1542,20 @@ async function loadHierarchyTree() {
 
     container.innerHTML = '<div class="loading"><div class="spinner"></div>Building tree...</div>';
 
-    // Query hierarchy structure
+    // Optimized query using pre-computed hasElementCount
     const query = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
 
-SELECT ?path ?name ?type (COUNT(?child) AS ?children)
+SELECT ?path ?name ?type ?children
 WHERE {
     ?node a ?type ;
           rdfs:label ?name ;
-          sp3d:hasSystemPath ?path .
+          sp3d:hasSystemPath ?path ;
+          navis:hasElementCount ?children .
     FILTER(?type IN (navis:Project, navis:Area, navis:Unit, navis:System))
-    OPTIONAL { ?node navis:containsElement ?child }
 }
-GROUP BY ?path ?name ?type
 ORDER BY ?path
 LIMIT 500`;
 

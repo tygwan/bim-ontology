@@ -73,6 +73,7 @@ class NavisToRDFConverter:
         self._object_cache: Dict[str, URIRef] = {}
         self._hierarchy: Dict[str, Dict] = {}
         self._path_node_cache: Dict[str, URIRef] = {}  # System Path → URI
+        self._path_element_counts: Dict[str, int] = {}  # System Path → element count
 
     def _bind_namespaces(self):
         """네임스페이스를 그래프에 바인딩한다."""
@@ -120,6 +121,8 @@ class NavisToRDFConverter:
         self.graph.add((NAVIS.isContainedIn, RDFS.label, Literal("Is Contained In")))
         self.graph.add((NAVIS.hasSystemPathParent, RDF.type, OWL.ObjectProperty))
         self.graph.add((NAVIS.hasSystemPathParent, RDFS.label, Literal("System Path Parent")))
+        self.graph.add((NAVIS.hasElementCount, RDF.type, OWL.DatatypeProperty))
+        self.graph.add((NAVIS.hasElementCount, RDFS.label, Literal("Element Count (pre-computed)")))
 
         # Navis 프로퍼티
         props = [
@@ -349,13 +352,27 @@ class NavisToRDFConverter:
                     prop_uri, datatype = self.SP3D_PROPERTY_MAP[prop_name]
                     self.graph.add((uri, prop_uri, Literal(prop_value, datatype=datatype)))
 
-            # System Path 기반 계층 연결
+            # System Path 기반 계층 연결 + 카운트
             system_path = obj_data["sp3d_properties"].get("System Path", "")
             if system_path:
                 path_node = self._get_or_create_path_node(system_path)
                 if path_node:
                     self.graph.add((uri, NAVIS.isContainedIn, path_node))
                     self.graph.add((path_node, NAVIS.containsElement, uri))
+
+                    # 해당 경로와 모든 상위 경로의 요소 수 증가
+                    parts = system_path.split("\\")
+                    for i in range(len(parts)):
+                        ancestor_path = "\\".join(parts[: i + 1])
+                        self._path_element_counts[ancestor_path] = (
+                            self._path_element_counts.get(ancestor_path, 0) + 1
+                        )
+
+        # 계층 노드에 미리 계산된 요소 수 추가
+        for path, count in self._path_element_counts.items():
+            if path in self._path_node_cache:
+                node_uri = self._path_node_cache[path]
+                self.graph.add((node_uri, NAVIS.hasElementCount, Literal(count, datatype=XSD.integer)))
 
         # 계층 노드 통계
         stats["path_nodes"] = len(self._path_node_cache)
