@@ -169,30 +169,34 @@ function coerceInt(value) {
     return Number.isFinite(n) ? n : null;
 }
 
-function updateDepthSelector(selectId, maxLevel, labelMap = null, preferredValue = 3) {
+function updateDepthSelector(selectId, maxLevel, options_config = {}) {
     const select = document.getElementById(selectId);
     if (!select) return;
 
+    const { labelMap = null, preferredValue = null, startAt = 1 } = options_config;
     const currentValue = coerceInt(select.value);
     const targetLevel = Number.isFinite(maxLevel) && maxLevel > 0 ? maxLevel : DEFAULT_MAX_LEVEL;
 
     let options = '';
-    for (let i = 1; i <= targetLevel; i++) {
+    for (let i = startAt; i <= targetLevel; i++) {
         const label = labelMap && labelMap[i] ? `Depth ${i} (${labelMap[i]})` : `Depth ${i}`;
         options += `<option value="${i}">${label}</option>`;
     }
     select.innerHTML = options;
     select.disabled = false;
 
-    const nextValue = currentValue && currentValue <= targetLevel
+    const defaultVal = preferredValue != null ? Math.min(preferredValue, targetLevel) : targetLevel;
+    const nextValue = currentValue && currentValue >= startAt && currentValue <= targetLevel
         ? currentValue
-        : Math.min(preferredValue, targetLevel);
+        : defaultVal;
     select.value = nextValue;
 }
 
 function updateDepthSelectors(maxLevel) {
-    updateDepthSelector('hierarchy-depth', maxLevel, SYSTEM_DEPTH_LABELS, 3);
-    updateDepthSelector('navis-depth', maxLevel, null, 3);
+    // System Path: max 4 levels (Project/Area/Unit/System), default 3
+    updateDepthSelector('hierarchy-depth', Math.min(maxLevel || 4, 4), { labelMap: SYSTEM_DEPTH_LABELS, preferredValue: 3 });
+    // Navisworks: full depth range, default to max
+    updateDepthSelector('navis-depth', maxLevel, { preferredValue: null });
 }
 
 function updateBadgeText(elementId, label, value) {
@@ -2366,7 +2370,7 @@ SELECT ?node ?name ?level ?parent ?children ?descendants WHERE {
     OPTIONAL { ?node navis:hasChildCount ?children }
     OPTIONAL { ?node navis:hasDescendantCount ?descendants }
     FILTER(BOUND(?parent) || BOUND(?children))
-} ORDER BY ?level ?name LIMIT 2000`;
+} ORDER BY ?level ?name LIMIT 15000`;
 
     const data = await apiPost('/api/sparql', { query });
 
