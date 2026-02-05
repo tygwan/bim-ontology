@@ -62,6 +62,26 @@
         .node-detail-body { padding: 16px; max-height: 300px; overflow: auto; }
         #exp-types { max-height: 600px; overflow-y: auto; }
         #exp-columns { display: flex; flex-wrap: wrap; gap: 4px; }
+        .help-panel { background: #0b1220; border: 1px solid #334155; border-radius: 10px; margin-bottom: 16px; }
+        .help-panel summary { cursor: pointer; padding: 10px 16px; font-weight: 600; color: #93c5fd; }
+        .help-panel summary:hover { color: #bfdbfe; }
+        .help-panel .help-body { padding: 0 16px 12px; color: #cbd5f5; font-size: 0.85rem; line-height: 1.5; }
+        .help-panel .help-body code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #93c5fd; }
+        .help-panel .help-body ul { margin: 6px 0 0 18px; list-style: disc; }
+        /* Hierarchy Miller Columns */
+        .miller-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; }
+        .miller-breadcrumb .crumb { cursor: pointer; color: #93c5fd; }
+        .miller-breadcrumb .crumb:hover { color: #bfdbfe; }
+        .miller-breadcrumb .crumb-sep { color: #475569; }
+        .miller-columns { display: flex; gap: 12px; height: 430px; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
+        .miller-column { background: #0f172a; border: 1px solid #334155; border-radius: 10px; display: flex; flex-direction: column; }
+        .miller-column-header { padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; border-bottom: 1px solid #334155; }
+        .miller-column-list { padding: 6px; overflow-y: auto; flex: 1; }
+        .miller-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #e2e8f0; }
+        .miller-item:hover { background: #1e293b; }
+        .miller-item.selected { background: #1e3a5f; color: #93c5fd; box-shadow: inset 0 0 0 1px #3b82f6; }
+        .miller-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .miller-empty { padding: 10px; font-size: 12px; color: #64748b; }
     </style>
 </head>
 <body>
@@ -99,29 +119,66 @@
         <main class="p-6" id="main-content">
             <!-- Overview Tab -->
             <div id="tab-overview" class="tab-content">
-                <div class="grid grid-cols-4 gap-4 mb-6">
-                    <div class="card">
+                <details class="help-panel" open>
+                    <summary>Help: Overview</summary>
+                    <div class="help-body">
+                        <p>Select a TTL data source and click Load to set the active RDF graph. All stats and charts update from the active graph.</p>
+                        <ul>
+                            <li>Total Triples: total RDF statements in the graph.</li>
+                            <li>Objects: BIM elements/instances (physical objects).</li>
+                            <li>Property Values: literal values attached to elements and property sets.</li>
+                            <li>Categories: distinct category labels.</li>
+                            <li>Max Depth: deepest hierarchy level from <code>navis:maxHierarchyLevel</code>.</li>
+                        </ul>
+                    </div>
+                </details>
+                <!-- File Selector -->
+                <div class="card mb-4">
+                    <div class="card-body flex items-center justify-between py-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm text-gray-400">Data Source:</span>
+                            <select id="overview-file-select" class="text-sm" style="min-width: 280px;">
+                                <option value="">Loading...</option>
+                            </select>
+                            <button class="btn btn-primary text-sm" onclick="loadOverviewFile()">Load</button>
+                            <span id="overview-file-status" class="text-xs text-gray-500"></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500">Max Depth:</span>
+                            <span id="overview-max-level" class="badge badge-blue">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-5 gap-4 mb-6">
+                    <div class="card" title="Total number of RDF triples in the active graph.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="stat-triples">--</div>
                             <div class="stat-label">Total Triples</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Count of BIM elements/instances in the graph.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="stat-elements">--</div>
-                            <div class="stat-label">Physical Elements</div>
+                            <div class="stat-label">Objects</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Total literal property values across all property sets.">
+                        <div class="card-body text-center">
+                            <div class="stat-value" id="stat-properties">--</div>
+                            <div class="stat-label">Property Values</div>
+                        </div>
+                    </div>
+                    <div class="card" title="Number of distinct category labels (bim:hasCategory).">
                         <div class="card-body text-center">
                             <div class="stat-value" id="stat-categories">--</div>
                             <div class="stat-label">Categories</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Maximum hierarchy depth from navis metadata.">
                         <div class="card-body text-center">
-                            <div class="stat-value" id="stat-buildings">--</div>
-                            <div class="stat-label">Buildings</div>
+                            <div class="stat-value" id="stat-max-level">--</div>
+                            <div class="stat-label">Max Depth</div>
                         </div>
                     </div>
                 </div>
@@ -144,17 +201,23 @@
 
             <!-- Buildings Tab -->
             <div id="tab-buildings" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Buildings</summary>
+                    <div class="help-body">
+                        <p>Browse the IFC building hierarchy (Project → Site → Building → Storey → Space). Click a node to see storey and element details.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="card col-span-1">
                         <div class="card-header">Building Hierarchy</div>
                         <div class="card-body" id="hierarchy-tree">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading building hierarchy...</div>
                         </div>
                     </div>
                     <div class="card col-span-2">
                         <div class="card-header">Storeys & Elements</div>
                         <div class="card-body" id="storey-detail">
-                            <p class="text-gray-500 text-sm">Select a building from the hierarchy to view details.</p>
+                            <p class="text-gray-500 text-sm">Select a building node to view storeys and element counts.</p>
                         </div>
                     </div>
                 </div>
@@ -162,6 +225,20 @@
 
             <!-- Hierarchy Tab (System Path Visualization) -->
             <div id="tab-hierarchy" class="tab-content" style="display:none">
+                <details class="help-panel">
+                    <summary>Help: Hierarchy</summary>
+                    <div class="help-body">
+                        <p><strong>System Path Tree</strong> (top-right): Collapsible tree from <code>sp3d:hasSystemPath</code>. Shows Project > Area > Unit > System. Click nodes to expand/collapse.</p>
+                        <p><strong>Navisworks Hierarchy Tree</strong> (below): Miller Columns drill-down using <code>navis:hasParent</code>. Click a node to see its children in the next column. Scroll horizontally for deeper levels.</p>
+                        <ul>
+                            <li><strong>Depth selector</strong>: Set how deep to load. Lower = faster. Start with 3-4.</li>
+                            <li><strong>Show Graph</strong>: Canvas visualization of selected node and children.</li>
+                            <li><strong>Property Summary</strong>: Appears when you select a node. Shows category breakdown and status distribution of all descendants.</li>
+                            <li><strong>Hierarchy Details</strong>: Shows children table for the selected node.</li>
+                        </ul>
+                        <p><strong>Tip</strong>: Use <code>navis-via-csv-v3.ttl</code> for PropertyValue aggregation data.</p>
+                    </div>
+                </details>
                 <!-- File Selector -->
                 <div class="card mb-4">
                     <div class="card-header flex items-center justify-between">
@@ -180,7 +257,7 @@
                     <div class="card">
                         <div class="card-header">Data Comparison</div>
                         <div class="card-body" id="hierarchy-comparison">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading hierarchy summary...</div>
                         </div>
                     </div>
                     <div class="card">
@@ -189,44 +266,59 @@
                             <button class="btn btn-secondary text-xs" onclick="loadLevelDistribution()">Refresh</button>
                         </div>
                         <div class="card-body" id="level-distribution">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading level distribution...</div>
                         </div>
                     </div>
                     <div class="card col-span-2">
                         <div class="card-header flex items-center justify-between">
                             <span>System Path Tree</span>
                             <div class="flex gap-2">
-                                <select id="hierarchy-depth" class="text-sm">
-                                    <option value="2">Depth 2 (Area)</option>
-                                    <option value="3" selected>Depth 3 (Unit)</option>
-                                    <option value="4">Depth 4 (System)</option>
+                                <select id="hierarchy-depth" class="text-sm" disabled>
+                                    <option value="">Loading levels...</option>
                                 </select>
                                 <button class="btn btn-primary text-sm" onclick="loadHierarchyTree()">Load</button>
                             </div>
                         </div>
-                        <div class="card-body" style="height: 500px; overflow: auto;">
+                        <div class="card-body" style="height: 500px; overflow-y: auto;" data-scroll-id="system-tree">
                             <div id="hierarchy-tree-view"></div>
                         </div>
                     </div>
                 </div>
-                <!-- Navisworks Hierarchy Tree (ParentId 기반) -->
+                <!-- Navisworks Hierarchy Tree (ParentId 기반) - Miller Columns -->
                 <div class="card mb-4">
                     <div class="card-header flex items-center justify-between">
                         <span>Navisworks Hierarchy Tree (ParentId 기반)</span>
                         <div class="flex gap-2">
-                            <select id="navis-depth" class="text-sm">
-                                <option value="2">Depth 2</option>
-                                <option value="3" selected>Depth 3</option>
-                                <option value="4">Depth 4</option>
-                                <option value="5">Depth 5</option>
+                            <button class="btn btn-secondary text-sm" onclick="resetNavisDrilldown()">Reset</button>
+                            <button class="btn btn-secondary text-sm" onclick="toggleNavisGraph()" id="navis-graph-btn">Show Graph</button>
+                            <select id="navis-depth" class="text-sm" disabled>
+                                <option value="">Loading levels...</option>
                             </select>
                             <button class="btn btn-primary text-sm" onclick="loadNavisHierarchyTree()">Load</button>
                         </div>
                     </div>
-                    <div class="card-body" style="height: 400px; overflow: auto;">
-                        <div id="navis-tree-view">
-                            <p class="text-gray-500 text-sm">Click Load to view the Navisworks hierarchy tree.</p>
+                    <div class="card-body" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div id="navis-breadcrumb" class="miller-breadcrumb"></div>
+                        <div id="navis-tree-view" class="miller-columns" style="height: 350px;" data-scroll-id="navis-tree"></div>
+                    </div>
+                </div>
+                <!-- Property Aggregation Panel -->
+                <div class="card mb-4" id="navis-aggregation-card" style="display:none">
+                    <div class="card-header flex items-center justify-between">
+                        <span id="navis-agg-title">Property Summary</span>
+                        <button class="btn btn-secondary text-sm" onclick="loadNavisAggregation()">Refresh</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="navis-aggregation">
+                            <p class="text-gray-500 text-sm">Select a node to view aggregated properties.</p>
                         </div>
+                    </div>
+                </div>
+                <!-- Graph View (hidden by default) -->
+                <div class="card mb-4" id="navis-graph-card" style="display:none">
+                    <div class="card-header">Graph View</div>
+                    <div class="card-body" style="height: 400px; position: relative;">
+                        <canvas id="navis-graph-canvas" style="width:100%; height:100%;"></canvas>
                     </div>
                 </div>
 
@@ -234,7 +326,7 @@
                     <div class="card-header">Hierarchy Details</div>
                     <div class="card-body">
                         <div id="hierarchy-details">
-                            <p class="text-gray-500 text-sm">Select a node from the tree to view contained elements.</p>
+                            <p class="text-gray-500 text-sm">Select a node from either tree to view contained elements and level distribution.</p>
                         </div>
                     </div>
                 </div>
@@ -242,6 +334,12 @@
 
             <!-- Elements Tab -->
             <div id="tab-elements" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Elements</summary>
+                    <div class="help-body">
+                        <p>Filter by category or search by name. Results are paged; use Prev/Next to navigate.</p>
+                    </div>
+                </details>
                 <div class="card">
                     <div class="card-header flex items-center justify-between">
                         <span>Elements</span>
@@ -264,7 +362,7 @@
                                 </tr>
                             </thead>
                             <tbody id="elements-table">
-                                <tr><td colspan="4" class="text-center text-gray-500">Loading...</td></tr>
+                                <tr><td colspan="4" class="text-center text-gray-500">Loading elements...</td></tr>
                             </tbody>
                         </table>
                         <div class="flex items-center justify-between mt-4">
@@ -280,6 +378,13 @@
 
             <!-- SPARQL Tab -->
             <div id="tab-sparql" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: SPARQL</summary>
+                    <div class="help-body">
+                        <p>Use the templates on the right to start quickly. Keep queries fast with <code>LIMIT</code> and use <code>OPTIONAL</code> for sparse data.</p>
+                        <p>Prefixes are prefilled in the editor. Results render as a table below.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="card col-span-2">
                         <div class="card-header flex items-center justify-between">
@@ -319,6 +424,12 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Properties Tab -->
             <div id="tab-properties" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Properties</summary>
+                    <div class="help-body">
+                        <p>Lookup by GlobalId to view all PropertySets for a single element. Use Property Search to find elements that contain a specific property key (up to 50 results).</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="card col-span-1">
                         <div class="card-header">Property Lookup</div>
@@ -345,13 +456,19 @@ ORDER BY DESC(?num)</textarea>
                 <div class="card mt-4">
                     <div class="card-header">Smart3D Plant Data Summary</div>
                     <div class="card-body" id="plant-data">
-                        <div class="loading"><div class="spinner"></div>Loading plant data...</div>
+                        <div class="loading"><div class="spinner"></div>Loading plant property summary...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Ontology Editor Tab -->
             <div id="tab-ontology" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Ontology</summary>
+                    <div class="help-body">
+                        <p>Manage schema classes and relations, edit classification rules, and import/export JSON schemas. Apply changes to update the active RDF graph.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="card">
                         <div class="card-header flex items-center justify-between">
@@ -359,7 +476,7 @@ ORDER BY DESC(?num)</textarea>
                             <button class="btn btn-primary text-sm" onclick="showCreateTypeForm()">+ New Type</button>
                         </div>
                         <div class="card-body" style="max-height:400px;overflow:auto" id="ontology-types">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading object types...</div>
                         </div>
                     </div>
                     <div class="card">
@@ -368,7 +485,7 @@ ORDER BY DESC(?num)</textarea>
                             <button class="btn btn-primary text-sm" onclick="showCreateLinkForm()">+ New Link</button>
                         </div>
                         <div class="card-body" style="max-height:400px;overflow:auto" id="ontology-links">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading link types...</div>
                         </div>
                     </div>
                 </div>
@@ -400,6 +517,12 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Validation Tab -->
             <div id="tab-validation" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Validation</summary>
+                    <div class="help-body">
+                        <p>Select a TTL file and run validation to generate quality checks. Use the filter chips to show or hide check categories, and click a check to expand details.</p>
+                    </div>
+                </details>
                 <!-- Controls -->
                 <div class="card mb-4">
                     <div class="card-body flex flex-wrap items-center gap-4">
@@ -416,25 +539,25 @@ ORDER BY DESC(?num)</textarea>
                 </div>
                 <!-- Summary Cards -->
                 <div class="grid grid-cols-4 gap-4 mb-4" id="val-summary" style="display:none">
-                    <div class="card">
+                    <div class="card" title="Total number of RDF triples in the validated graph.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="val-total-triples">--</div>
                             <div class="stat-label">Total Triples</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Checks that passed all validation criteria.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="val-pass" style="color:#4ade80">--</div>
                             <div class="stat-label">PASS</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Checks with warnings or informational issues.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="val-warn" style="color:#fbbf24">--</div>
                             <div class="stat-label">WARN</div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" title="Checks that failed validation criteria.">
                         <div class="card-body text-center">
                             <div class="stat-value" id="val-fail" style="color:#f87171">--</div>
                             <div class="stat-label">FAIL</div>
@@ -443,7 +566,7 @@ ORDER BY DESC(?num)</textarea>
                 </div>
                 <!-- Check Cards Grid -->
                 <div class="grid grid-cols-2 gap-4" id="val-checks">
-                    <div class="loading" id="val-placeholder"><p class="text-gray-500 text-sm">Select a TTL file and click "Run Validation" to start.</p></div>
+                    <div class="loading" id="val-placeholder"><p class="text-gray-500 text-sm">Select a TTL file (or use the current graph) and click "Run Validation" to start.</p></div>
                 </div>
                 <!-- Other Category Explorer -->
                 <div class="card mt-4" id="val-other-explorer" style="display:none">
@@ -467,7 +590,7 @@ ORDER BY DESC(?num)</textarea>
                                 </tr>
                             </thead>
                             <tbody id="other-elements-table">
-                                <tr><td colspan="5" class="text-center text-gray-500">Loading...</td></tr>
+                                <tr><td colspan="5" class="text-center text-gray-500">Loading other elements...</td></tr>
                             </tbody>
                         </table>
                         <div class="flex items-center justify-between mt-3">
@@ -483,16 +606,28 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Explorer Tab -->
             <div id="tab-explorer" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Explorer</summary>
+                    <div class="help-body">
+                        <p>Explore any RDF node type. Select predicates as columns, then click Load. Use search to filter subjects or labels, and click a row to see full triples.</p>
+                    </div>
+                </details>
                 <!-- Controls -->
                 <div class="card mb-4">
-                    <div class="card-body flex items-center gap-4">
-                        <div class="flex items-center gap-2">
-                            <label class="text-xs text-gray-500">TTL File:</label>
-                            <select id="exp-ttl-select" class="text-sm" style="min-width:200px">
-                                <option value="">Loading...</option>
-                            </select>
+                    <div class="card-body">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs text-gray-500">TTL File:</label>
+                                <select id="exp-ttl-select" class="text-sm" style="min-width:200px">
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary text-sm" onclick="refreshExplorer()">Refresh</button>
                         </div>
-                        <button class="btn btn-secondary text-sm" onclick="refreshExplorer()">Refresh</button>
+                        <div class="flex items-center gap-2 mt-2 text-xs text-gray-500" id="exp-meta">
+                            <span class="badge badge-blue" id="exp-max-level">Max Level: --</span>
+                            <span class="badge badge-green" id="exp-prop-count">Property Values: --</span>
+                        </div>
                     </div>
                 </div>
                 <!-- Main Layout -->
@@ -501,7 +636,7 @@ ORDER BY DESC(?num)</textarea>
                     <div class="card">
                         <div class="card-header">Node Types</div>
                         <div class="card-body" id="exp-types">
-                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                            <div class="loading"><div class="spinner"></div>Loading node types...</div>
                         </div>
                     </div>
                     <!-- Right: Columns + Table + Detail -->
@@ -529,7 +664,7 @@ ORDER BY DESC(?num)</textarea>
                                 <table>
                                     <thead id="exp-thead"><tr><th>subject</th></tr></thead>
                                     <tbody id="exp-tbody">
-                                        <tr><td class="text-gray-500">Select a type and columns, then click Load.</td></tr>
+                                        <tr><td class="text-gray-500">Select a node type and predicates, then click Load.</td></tr>
                                     </tbody>
                                 </table>
                                 <div class="flex items-center justify-between mt-4">
@@ -555,11 +690,17 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Lean Layer Tab -->
             <div id="tab-lean" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Lean Layer</summary>
+                    <div class="help-body">
+                        <p>Inject schedule/AWP/status/equipment CSVs into the graph and review the resulting summary metrics.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-4 gap-4 mb-4">
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-blue-400" id="lean-tasks">--</div><div class="stat-label">Tasks</div></div></div>
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-green-400" id="lean-iwps">--</div><div class="stat-label">IWPs</div></div></div>
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-yellow-400" id="lean-statuses">--</div><div class="stat-label">Statuses</div></div></div>
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-purple-400" id="lean-equipment">--</div><div class="stat-label">Equipment</div></div></div>
+                    <div class="card" title="Total construction tasks in the lean layer."><div class="card-body text-center"><div class="stat-value text-blue-400" id="lean-tasks">--</div><div class="stat-label">Tasks</div></div></div>
+                    <div class="card" title="Installation Work Packages (IWPs) loaded from lean data."><div class="card-body text-center"><div class="stat-value text-green-400" id="lean-iwps">--</div><div class="stat-label">IWPs</div></div></div>
+                    <div class="card" title="Distinct status values assigned to elements."><div class="card-body text-center"><div class="stat-value text-yellow-400" id="lean-statuses">--</div><div class="stat-label">Statuses</div></div></div>
+                    <div class="card" title="Equipment records with size/capacity data."><div class="card-body text-center"><div class="stat-value text-purple-400" id="lean-equipment">--</div><div class="stat-label">Equipment</div></div></div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="card">
@@ -593,6 +734,12 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Today's Work Tab -->
             <div id="tab-todayswork" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Today's Work</summary>
+                    <div class="help-body">
+                        <p>Select a target date to load work packages and element counts scheduled for that day.</p>
+                    </div>
+                </details>
                 <div class="card mb-4">
                     <div class="card-body flex items-center gap-4">
                         <label class="text-xs text-gray-500">Target Date:</label>
@@ -602,9 +749,9 @@ ORDER BY DESC(?num)</textarea>
                     </div>
                 </div>
                 <div class="grid grid-cols-3 gap-4 mb-4" id="tw-summary" style="display:none">
-                    <div class="card"><div class="card-body text-center"><div class="stat-value" id="tw-iwp-count">--</div><div class="stat-label">Active IWPs</div></div></div>
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-green-400" id="tw-elem-count">--</div><div class="stat-label">Total Elements</div></div></div>
-                    <div class="card"><div class="card-body text-center"><div class="stat-value text-blue-400" id="tw-exec-count">--</div><div class="stat-label">Executable</div></div></div>
+                    <div class="card" title="Installation Work Packages active on the selected date."><div class="card-body text-center"><div class="stat-value" id="tw-iwp-count">--</div><div class="stat-label">Active IWPs</div></div></div>
+                    <div class="card" title="Total elements scheduled for the selected date."><div class="card-body text-center"><div class="stat-value text-green-400" id="tw-elem-count">--</div><div class="stat-label">Total Elements</div></div></div>
+                    <div class="card" title="Elements that are executable based on current constraints."><div class="card-body text-center"><div class="stat-value text-blue-400" id="tw-exec-count">--</div><div class="stat-label">Executable</div></div></div>
                 </div>
                 <div class="card">
                     <div class="card-header">Work Packages for Today</div>
@@ -616,6 +763,12 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Status Monitor Tab -->
             <div id="tab-statusmon" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Status Monitor</summary>
+                    <div class="help-body">
+                        <p>Check delayed elements against a reference date, review delivery status distribution, and update element status values.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="card">
                         <div class="card-header flex items-center justify-between">
@@ -626,7 +779,7 @@ ORDER BY DESC(?num)</textarea>
                             </div>
                         </div>
                         <div class="card-body">
-                            <div class="text-center mb-3"><div class="stat-value text-red-400" id="sm-delayed-count">--</div><div class="stat-label">Delayed</div></div>
+                            <div class="text-center mb-3" title="Elements with planned dates before the reference date that are not installed."><div class="stat-value text-red-400" id="sm-delayed-count">--</div><div class="stat-label">Delayed</div></div>
                             <div id="sm-delayed-list" style="max-height:300px;overflow:auto"></div>
                         </div>
                     </div>
@@ -672,6 +825,12 @@ ORDER BY DESC(?num)</textarea>
 
             <!-- Reasoning Tab -->
             <div id="tab-reasoning" class="tab-content" style="display:none">
+                <details class="help-panel" open>
+                    <summary>Help: Reasoning</summary>
+                    <div class="help-body">
+                        <p>Run OWL/RDFS reasoning and custom rules on the active graph. The before/after counts show how many triples were inferred.</p>
+                    </div>
+                </details>
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="card">
                         <div class="card-header flex items-center justify-between">

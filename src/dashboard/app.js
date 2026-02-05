@@ -7,30 +7,135 @@ let currentPage = 0;
 const PAGE_SIZE = 50;
 let categoryChart = null;
 let barChart = null;
+const DEFAULT_MAX_LEVEL = 5;
+const SYSTEM_DEPTH_LABELS = { 1: 'Project', 2: 'Area', 3: 'Unit', 4: 'System' };
+let metadataCache = { maxLevel: null, totalObjects: null, totalProps: null };
+const tabState = {};
+let activeTabName = 'overview';
 
 // ── Navigation ──
 
-document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-        tab.classList.add('active');
-        const target = document.getElementById('tab-' + tab.dataset.tab);
-        if (target) target.style.display = 'block';
+function ensureTabState(tabName) {
+    if (!tabState[tabName]) {
+        tabState[tabName] = {
+            initialized: false,
+            scrollTop: 0,
+            scrolls: {},
+            formValues: {},
+            page: null,
+            drillPaths: [],
+        };
+    }
+    return tabState[tabName];
+}
 
-        // Lazy-load tab data
-        const tabName = tab.dataset.tab;
-        if (tabName === 'buildings') loadHierarchy();
-        if (tabName === 'hierarchy') initHierarchyTab();
-        if (tabName === 'elements') { loadCategoryFilter(); loadElements(); }
-        if (tabName === 'properties') loadPlantData();
-        if (tabName === 'ontology') { loadOntologyTypes(); loadOntologyLinks(); loadRules(); }
-        if (tabName === 'validation') loadTTLFiles();
-        if (tabName === 'explorer') initExplorer();
-        if (tabName === 'lean') loadLeanStats();
-        if (tabName === 'todayswork') initTodaysWork();
-        if (tabName === 'statusmon') initStatusMonitor();
+function captureFormState(tabEl) {
+    const values = {};
+    tabEl.querySelectorAll('input, select, textarea').forEach(el => {
+        if (!el.id) return;
+        if (el.type === 'checkbox' || el.type === 'radio') values[el.id] = el.checked;
+        else values[el.id] = el.value;
     });
+    return values;
+}
+
+function restoreFormState(tabEl, values) {
+    if (!values) return;
+    Object.entries(values).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (!el || !tabEl.contains(el)) return;
+        if (el.type === 'checkbox' || el.type === 'radio') el.checked = Boolean(value);
+        else el.value = value;
+    });
+}
+
+function saveTabState(tabName) {
+    if (!tabName) return;
+    const tabEl = document.getElementById('tab-' + tabName);
+    if (!tabEl) return;
+
+    const state = ensureTabState(tabName);
+    state.formValues = captureFormState(tabEl);
+    state.scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    state.scrolls = {};
+    tabEl.querySelectorAll('[data-scroll-id]').forEach(el => {
+        state.scrolls[el.dataset.scrollId] = { top: el.scrollTop, left: el.scrollLeft };
+    });
+
+    if (tabName === 'elements') {
+        state.page = currentPage;
+    }
+    if (tabName === 'hierarchy') {
+        state.navisDrillUris = navisDrillState.selectedUris.slice();
+    }
+}
+
+function restoreTabState(tabName) {
+    const state = ensureTabState(tabName);
+    const tabEl = document.getElementById('tab-' + tabName);
+    if (!tabEl) return;
+
+    restoreFormState(tabEl, state.formValues);
+
+    if (tabName === 'elements' && Number.isFinite(state.page)) {
+        currentPage = state.page;
+    }
+    if (tabName === 'hierarchy' && Array.isArray(state.navisDrillUris)) {
+        navisDrillState.selectedUris = state.navisDrillUris.slice();
+        if (navisDrillData) renderNavisDrilldown();
+    }
+
+    requestAnimationFrame(() => {
+        if (Number.isFinite(state.scrollTop)) window.scrollTo(0, state.scrollTop);
+        tabEl.querySelectorAll('[data-scroll-id]').forEach(el => {
+            const pos = state.scrolls?.[el.dataset.scrollId];
+            if (!pos) return;
+            el.scrollTop = pos.top || 0;
+            el.scrollLeft = pos.left || 0;
+        });
+    });
+}
+
+function initializeTab(tabName) {
+    const state = ensureTabState(tabName);
+    if (state.initialized) return;
+
+    if (tabName === 'buildings') loadHierarchy();
+    if (tabName === 'hierarchy') initHierarchyTab();
+    if (tabName === 'elements') { loadCategoryFilter(); loadElements(); }
+    if (tabName === 'properties') loadPlantData();
+    if (tabName === 'ontology') { loadOntologyTypes(); loadOntologyLinks(); loadRules(); }
+    if (tabName === 'validation') loadTTLFiles();
+    if (tabName === 'explorer') initExplorer();
+    if (tabName === 'lean') loadLeanStats();
+    if (tabName === 'todayswork') initTodaysWork();
+    if (tabName === 'statusmon') initStatusMonitor();
+
+    state.initialized = true;
+}
+
+function setActiveTabUI(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    const tab = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
+    if (tab) tab.classList.add('active');
+    const target = document.getElementById('tab-' + tabName);
+    if (target) target.style.display = 'block';
+}
+
+function switchTab(tabName) {
+    if (!tabName || tabName === activeTabName) return;
+    saveTabState(activeTabName);
+    setActiveTabUI(tabName);
+    activeTabName = tabName;
+
+    const state = ensureTabState(tabName);
+    if (!state.initialized) initializeTab(tabName);
+    else restoreTabState(tabName);
+}
+
+document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
 });
 
 // ── API Helpers ──
@@ -59,6 +164,72 @@ function formatNumber(n) {
     return n.toLocaleString();
 }
 
+function coerceInt(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? n : null;
+}
+
+function updateDepthSelector(selectId, maxLevel, labelMap = null, preferredValue = 3) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    const currentValue = coerceInt(select.value);
+    const targetLevel = Number.isFinite(maxLevel) && maxLevel > 0 ? maxLevel : DEFAULT_MAX_LEVEL;
+
+    let options = '';
+    for (let i = 1; i <= targetLevel; i++) {
+        const label = labelMap && labelMap[i] ? `Depth ${i} (${labelMap[i]})` : `Depth ${i}`;
+        options += `<option value="${i}">${label}</option>`;
+    }
+    select.innerHTML = options;
+    select.disabled = false;
+
+    const nextValue = currentValue && currentValue <= targetLevel
+        ? currentValue
+        : Math.min(preferredValue, targetLevel);
+    select.value = nextValue;
+}
+
+function updateDepthSelectors(maxLevel) {
+    updateDepthSelector('hierarchy-depth', maxLevel, SYSTEM_DEPTH_LABELS, 3);
+    updateDepthSelector('navis-depth', maxLevel, null, 3);
+}
+
+function updateBadgeText(elementId, label, value) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const text = value == null ? '--' : formatNumber(value);
+    el.textContent = `${label}: ${text}`;
+}
+
+function updateMetadataUI() {
+    const maxLevel = metadataCache.maxLevel;
+    const totalProps = metadataCache.totalProps;
+    const totalObjects = metadataCache.totalObjects;
+    const displayMaxLevel = maxLevel && maxLevel > 0 ? maxLevel : null;
+
+    const maxLevelBadge = document.getElementById('overview-max-level');
+    const maxLevelStat = document.getElementById('stat-max-level');
+    const propStat = document.getElementById('stat-properties');
+
+    if (maxLevelBadge) {
+        maxLevelBadge.textContent = displayMaxLevel == null ? '--' : `Level ${displayMaxLevel}`;
+        maxLevelBadge.title = `Objects: ${formatNumber(totalObjects || 0)}, Properties: ${formatNumber(totalProps || 0)}`;
+    }
+    if (maxLevelStat) {
+        maxLevelStat.textContent = displayMaxLevel == null ? '--' : displayMaxLevel;
+    }
+    if (propStat) {
+        propStat.textContent = totalProps == null ? '--' : formatNumber(totalProps);
+    }
+
+    updateDepthSelectors(maxLevel);
+    updateBadgeText('hierarchy-max-level', 'Max Level', displayMaxLevel);
+    updateBadgeText('hierarchy-prop-count', 'Property Values', totalProps);
+    updateBadgeText('exp-max-level', 'Max Level', displayMaxLevel);
+    updateBadgeText('exp-prop-count', 'Property Values', totalProps);
+}
+
 // ── Health & Init ──
 
 async function checkHealth() {
@@ -76,6 +247,102 @@ async function checkHealth() {
 }
 
 // ── Overview Tab ──
+
+let overviewFilesLoaded = false;
+
+async function loadOverviewFiles() {
+    if (overviewFilesLoaded) return;
+
+    const select = document.getElementById('overview-file-select');
+    const data = await api('/api/reasoning/ttl-files');
+
+    if (!data || !data.files) {
+        select.innerHTML = '<option value="">Failed to load files</option>';
+        return;
+    }
+
+    // Sort files: v3 first, then by name
+    const sortedFiles = data.files
+        .filter(f => f.name.endsWith('.ttl'))
+        .sort((a, b) => {
+            if (a.name.includes('-v3')) return -1;
+            if (b.name.includes('-v3')) return 1;
+            return b.size_kb - a.size_kb;  // Larger files first
+        });
+
+    select.innerHTML = sortedFiles
+        .map(f => {
+            const label = f.name.includes('-v3') ? `${f.name} [Full Properties]` : f.name;
+            const selected = f.name.includes('-v3') ? 'selected' : '';
+            return `<option value="${f.name}" ${selected}>${label} (${f.size_kb} KB)</option>`;
+        })
+        .join('');
+
+    overviewFilesLoaded = true;
+}
+
+async function loadOverviewFile() {
+    const select = document.getElementById('overview-file-select');
+    const status = document.getElementById('overview-file-status');
+    const fileName = select.value;
+
+    if (!fileName) {
+        status.textContent = 'Please select a file';
+        status.style.color = '#f87171';
+        return;
+    }
+
+    status.textContent = 'Loading graph...';
+    status.style.color = '#94a3b8';
+
+    try {
+        const data = await apiPost(`/api/reasoning/reload?file_name=${encodeURIComponent(fileName)}`, {});
+
+        if (data && data.status === 'success') {
+            status.textContent = `Loaded: ${formatNumber(data.triples)} triples`;
+            status.style.color = '#4ade80';
+
+            // Refresh all data
+            checkHealth();
+            loadOverview();
+            loadMaxLevel();
+
+            // Sync hierarchy file select if on that tab
+            const hierSelect = document.getElementById('hierarchy-file-select');
+            if (hierSelect) hierSelect.value = fileName;
+        } else {
+            status.textContent = `Error: ${data?.detail || 'Unknown'}`;
+            status.style.color = '#f87171';
+        }
+    } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        status.style.color = '#f87171';
+    }
+}
+
+async function loadMaxLevel() {
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+SELECT ?maxLevel ?totalObjects ?totalProps WHERE {
+    ?meta navis:maxHierarchyLevel ?maxLevel .
+    OPTIONAL { ?meta navis:totalObjects ?totalObjects }
+    OPTIONAL { ?meta navis:totalPropertyValues ?totalProps }
+}`;
+
+    const data = await apiPost('/api/sparql', { query });
+    if (data && data.results && data.results.length > 0) {
+        const r = data.results[0];
+        metadataCache = {
+            maxLevel: coerceInt(r.maxLevel),
+            totalObjects: coerceInt(r.totalObjects),
+            totalProps: coerceInt(r.totalProps),
+        };
+        updateMetadataUI();
+    } else {
+        metadataCache = { maxLevel: null, totalObjects: null, totalProps: null };
+        updateMetadataUI();
+    }
+}
 
 async function loadOverview() {
     const stats = await api('/api/statistics');
@@ -157,9 +424,10 @@ function renderBarChart(cats) {
 
 async function loadHierarchy() {
     const container = document.getElementById('hierarchy-tree');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading building hierarchy...</div>';
     const data = await api('/api/hierarchy');
     if (!data) {
-        container.innerHTML = '<p class="text-gray-500 text-sm">Failed to load hierarchy.</p>';
+        container.innerHTML = '<p class="text-gray-500 text-sm">Failed to load building hierarchy. Check the data source.</p>';
         return;
     }
 
@@ -249,14 +517,14 @@ async function loadElements() {
     const category = document.getElementById('filter-category').value;
     const search = document.getElementById('filter-search').value;
     const tbody = document.getElementById('elements-table');
-    tbody.innerHTML = '<tr><td colspan="4" class="loading"><div class="spinner"></div>Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="loading"><div class="spinner"></div>Loading elements...</td></tr>';
 
     let url = `/api/elements?limit=${PAGE_SIZE}&offset=${currentPage * PAGE_SIZE}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;
 
     const data = await api(url);
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500">No elements found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500">No elements found. Try a different category or clear the search.</td></tr>';
         document.getElementById('elements-info').textContent = '0 elements';
         return;
     }
@@ -544,7 +812,7 @@ async function lookupProperties() {
     const gid = document.getElementById('prop-global-id').value.trim();
     if (!gid) return;
     const container = document.getElementById('prop-results');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading properties...</div>';
 
     const data = await api(`/api/properties/${encodeURIComponent(gid)}`);
     if (!data || data.detail) {
@@ -567,11 +835,11 @@ async function searchProperties() {
     const key = document.getElementById('prop-search-key').value.trim();
     if (!key) return;
     const container = document.getElementById('prop-results');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching properties...</div>';
 
     const data = await api(`/api/properties/search?key=${encodeURIComponent(key)}&limit=50`);
     if (!data || !data.results) {
-        container.innerHTML = '<p class="text-gray-500 text-sm">No results.</p>';
+        container.innerHTML = '<p class="text-gray-500 text-sm">No results. Try a shorter or different property key.</p>';
         return;
     }
 
@@ -947,7 +1215,7 @@ async function loadOtherElements() {
     const file = document.getElementById('val-ttl-select').value;
     const pattern = document.getElementById('other-name-filter').value.trim();
     const tbody = document.getElementById('other-elements-table');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading"><div class="spinner"></div>Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="loading"><div class="spinner"></div>Loading other elements...</td></tr>';
 
     let url = '/api/reasoning/other-elements?limit=' + OTHER_PAGE_SIZE + '&offset=' + (otherPage * OTHER_PAGE_SIZE);
     if (file) url += '&ttl_file=' + encodeURIComponent(file);
@@ -962,7 +1230,7 @@ async function loadOtherElements() {
     renderOtherGroups(data.name_groups || []);
 
     if (data.elements.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No elements found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500">No elements found. Try adjusting the name filter.</td></tr>';
     } else {
         tbody.innerHTML = data.elements.map(function(e) {
             var sug = suggestCategory(e.name);
@@ -1067,7 +1335,7 @@ function refreshExplorer() {
 
 async function loadNodeTypes() {
     const container = document.getElementById('exp-types');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading node types...</div>';
 
     const file = document.getElementById('exp-ttl-select').value;
     let url = '/api/reasoning/node-types';
@@ -1117,7 +1385,7 @@ async function loadNodePredicates() {
 
     const data = await api(url);
     if (!data || !data.predicates) {
-        container.innerHTML = '<span class="text-gray-500 text-xs">Failed to load predicates.</span>';
+        container.innerHTML = '<span class="text-gray-500 text-xs">No predicates found. Try refreshing or selecting another TTL file.</span>';
         return;
     }
 
@@ -1147,14 +1415,14 @@ async function loadNodes() {
 
     const columns = getSelectedColumns();
     if (columns.length === 0) {
-        tbody.innerHTML = '<tr><td class="text-gray-500">Select at least one column predicate.</td></tr>';
+        tbody.innerHTML = '<tr><td class="text-gray-500">Select at least one predicate column (tip: start with bim:hasName, bim:hasCategory).</td></tr>';
         thead.innerHTML = '<tr><th>subject</th></tr>';
         info.textContent = '--';
         pageInfo.textContent = '';
         return;
     }
 
-    tbody.innerHTML = '<tr><td colspan="' + (columns.length + 1) + '" class="loading"><div class="spinner"></div>Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + (columns.length + 1) + '" class="loading"><div class="spinner"></div>Loading nodes...</td></tr>';
 
     const file = document.getElementById('exp-ttl-select').value;
     const search = document.getElementById('exp-search').value.trim();
@@ -1175,7 +1443,7 @@ async function loadNodes() {
     thead.innerHTML = '<tr><th>subject</th>' + columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
 
     if (data.rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="' + (columns.length + 1) + '" class="text-center text-gray-500">No nodes found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + (columns.length + 1) + '" class="text-center text-gray-500">No nodes found. Try clearing filters or selecting a different type.</td></tr>';
         info.textContent = '0 total';
         pageInfo.textContent = '';
         return;
@@ -1314,7 +1582,7 @@ async function loadTodaysWork() {
     if (!targetDate) return;
 
     const container = document.getElementById('tw-table');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading work packages...</div>';
 
     const data = await api(`/api/lean/today?target_date=${targetDate}`);
     if (!data) {
@@ -1371,7 +1639,7 @@ function initStatusMonitor() {
 async function loadDelayed() {
     const refDate = document.getElementById('sm-ref-date').value;
     const list = document.getElementById('sm-delayed-list');
-    list.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    list.innerHTML = '<div class="loading"><div class="spinner"></div>Loading delayed elements...</div>';
 
     const data = await api(`/api/lean/delayed?reference_date=${refDate}`);
     if (!data) {
@@ -1480,6 +1748,145 @@ async function updateElementStatus() {
 // ── Hierarchy Tab ──
 
 let hierarchyFilesLoaded = false;
+let hierarchyDrillData = null;
+const HIERARCHY_DEFAULT_DETAIL_HTML = '<p class="text-gray-500 text-sm">Select a node from either tree to view contained elements and level distribution.</p>';
+
+function resetHierarchyDetails() {
+    const container = document.getElementById('hierarchy-details');
+    if (container) container.innerHTML = HIERARCHY_DEFAULT_DETAIL_HTML;
+}
+
+function buildHierarchyDrillData(rows, maxDepth) {
+    const nodesByPath = new Map();
+    const childrenByPath = new Map();
+    const roots = [];
+    const typeColors = {
+        'Project': '#8b5cf6',
+        'Area': '#3b82f6',
+        'Unit': '#10b981',
+        'System': '#64748b'
+    };
+
+    rows.forEach(row => {
+        const path = row.path;
+        const parts = path.split('\\\\');
+        if (parts.length > maxDepth) return;
+        const depth = parts.length;
+        const typeName = row.type.split('#').pop();
+        nodesByPath.set(path, {
+            path,
+            name: row.name,
+            type: typeName,
+            children: parseInt(row.children) || 0,
+            color: typeColors[typeName] || '#94a3b8',
+            depth,
+        });
+    });
+
+    nodesByPath.forEach(node => {
+        const parts = node.path.split('\\\\');
+        const parentPath = parts.slice(0, -1).join('\\\\');
+        if (parentPath && nodesByPath.has(parentPath)) {
+            if (!childrenByPath.has(parentPath)) childrenByPath.set(parentPath, []);
+            childrenByPath.get(parentPath).push(node);
+        } else {
+            roots.push(node);
+        }
+    });
+
+    const sortNodes = (list) => {
+        list.sort((a, b) => {
+            if (b.children !== a.children) return b.children - a.children;
+            return a.name.localeCompare(b.name);
+        });
+    };
+
+    sortNodes(roots);
+    childrenByPath.forEach(sortNodes);
+
+    return { nodesByPath, childrenByPath, roots, maxDepth };
+}
+
+function renderSystemPathTree() {
+    const container = document.getElementById('hierarchy-tree-view');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!hierarchyDrillData || hierarchyDrillData.roots.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">No system path nodes found. Try increasing depth or loading a different file.</p>';
+        return;
+    }
+
+    function createNodeEl(node) {
+        const div = document.createElement('div');
+        div.className = 'hierarchy-node';
+
+        const header = document.createElement('div');
+        header.className = 'tree-item flex items-center gap-2';
+
+        const children = hierarchyDrillData.childrenByPath.get(node.path) || [];
+        const hasChildren = children.length > 0;
+
+        const arrow = document.createElement('span');
+        arrow.className = 'text-xs';
+        arrow.style.color = '#64748b';
+        arrow.style.width = '14px';
+        arrow.style.display = 'inline-block';
+        arrow.style.textAlign = 'center';
+        arrow.textContent = hasChildren ? '\u25B6' : '\u2022';
+
+        const icon = document.createElement('span');
+        icon.className = 'node-icon';
+        icon.style.background = node.color;
+
+        const name = document.createElement('span');
+        name.className = 'text-sm';
+        name.style.flex = '1';
+        name.textContent = node.name || 'Unnamed';
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.background = `${node.color}22`;
+        badge.style.color = node.color;
+        badge.textContent = node.type;
+
+        const count = document.createElement('span');
+        count.className = 'text-xs text-gray-500';
+        count.textContent = node.children > 0 ? `(${node.children})` : '';
+
+        header.appendChild(arrow);
+        header.appendChild(icon);
+        header.appendChild(name);
+        header.appendChild(badge);
+        if (count.textContent) header.appendChild(count);
+
+        div.appendChild(header);
+
+        if (hasChildren) {
+            const childContainer = document.createElement('div');
+            childContainer.className = 'children';
+            childContainer.style.display = 'none';
+
+            children.forEach(child => childContainer.appendChild(createNodeEl(child)));
+            div.appendChild(childContainer);
+
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => {
+                const isOpen = childContainer.style.display !== 'none';
+                childContainer.style.display = isOpen ? 'none' : 'block';
+                arrow.textContent = isOpen ? '\u25B6' : '\u25BC';
+                loadHierarchyNodeDetail(node.path, node.name);
+            });
+        } else {
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => loadHierarchyNodeDetail(node.path, node.name));
+        }
+
+        return div;
+    }
+
+    hierarchyDrillData.roots.forEach(root => container.appendChild(createNodeEl(root)));
+}
 
 async function loadHierarchyFiles() {
     if (hierarchyFilesLoaded) return;
@@ -1515,7 +1922,7 @@ async function loadSelectedFile() {
         return;
     }
 
-    status.textContent = 'Loading...';
+    status.textContent = 'Loading graph...';
     status.style.color = '#94a3b8';
 
     try {
@@ -1527,8 +1934,11 @@ async function loadSelectedFile() {
 
             // Refresh all data
             checkHealth();
+            loadMaxLevel();
             loadHierarchyComparison();
+            resetHierarchyDetails();
             loadHierarchyTree();
+            loadNavisHierarchyTree();
         } else {
             status.textContent = `Error: ${data?.detail || 'Unknown'}`;
             status.style.color = '#f87171';
@@ -1541,6 +1951,7 @@ async function loadSelectedFile() {
 
 async function loadHierarchyComparison() {
     const container = document.getElementById('hierarchy-comparison');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading hierarchy summary...</div>';
 
     // Optimized query - simple type count
     const statsQuery = `
@@ -1556,7 +1967,7 @@ GROUP BY ?type`;
     const data = await apiPost('/api/sparql', { query: statsQuery });
 
     if (!data || !data.results || data.results.length === 0) {
-        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy stats</p>';
+        container.innerHTML = '<p class="text-gray-500 text-sm">No hierarchy stats found. Load a TTL file with Navis metadata.</p>';
         return;
     }
 
@@ -1572,7 +1983,14 @@ GROUP BY ?type`;
         else if (typeName === 'SP3DEntity') stats.elements = count;
     });
 
+    const maxLevelText = metadataCache.maxLevel && metadataCache.maxLevel > 0 ? metadataCache.maxLevel : '--';
+    const propValuesText = metadataCache.totalProps == null ? '--' : formatNumber(metadataCache.totalProps);
+
     container.innerHTML = `
+        <div class="flex flex-wrap gap-2 mb-3">
+            <span class="badge badge-blue" id="hierarchy-max-level">Max Level: ${maxLevelText}</span>
+            <span class="badge badge-green" id="hierarchy-prop-count">Property Values: ${propValuesText}</span>
+        </div>
         <div class="mb-4">
             <h4 class="text-sm font-semibold text-blue-400 mb-2">Current Data (dxtnavis)</h4>
             <table>
@@ -1598,6 +2016,7 @@ GROUP BY ?type`;
 
 async function loadLevelDistribution() {
     const container = document.getElementById('level-distribution');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading level distribution...</div>';
 
     // Query level distribution from original CSV Level (navis:hasLevel)
     const query = `
@@ -1614,7 +2033,7 @@ ORDER BY ?level`;
     const data = await apiPost('/api/sparql', { query });
 
     if (!data || !data.results || data.results.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-sm">No level data available</p>';
+        container.innerHTML = '<p class="text-gray-500 text-sm">No CSV level data available. Check that navis:hasLevel is present.</p>';
         return;
     }
 
@@ -1656,9 +2075,10 @@ ORDER BY ?level`;
 
 async function loadHierarchyTree() {
     const container = document.getElementById('hierarchy-tree-view');
-    const maxDepth = parseInt(document.getElementById('hierarchy-depth').value);
+    const depthValue = coerceInt(document.getElementById('hierarchy-depth')?.value);
+    const maxDepth = depthValue || metadataCache.maxLevel || DEFAULT_MAX_LEVEL;
 
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Building tree...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Building system path tree...</div>';
 
     // Optimized query using pre-computed hasElementCount
     const query = `
@@ -1680,103 +2100,17 @@ LIMIT 500`;
     const data = await apiPost('/api/sparql', { query });
 
     if (!data || !data.results) {
-        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy</p>';
+        container.innerHTML = '<p class="text-red-400">Failed to load system path hierarchy.</p>';
         return;
     }
 
-    // Build tree structure
-    const tree = {};
-    const typeColors = {
-        'Project': '#8b5cf6',
-        'Area': '#3b82f6',
-        'Unit': '#10b981',
-        'System': '#64748b'
-    };
-
-    data.results.forEach(row => {
-        const path = row.path;
-        const parts = path.split('\\\\');
-        if (parts.length > maxDepth) return;
-
-        const depth = parts.length - 1;
-        const typeName = row.type.split('#').pop();
-
-        if (!tree[depth]) tree[depth] = [];
-        tree[depth].push({
-            path: path,
-            name: row.name,
-            type: typeName,
-            children: parseInt(row.children) || 0,
-            color: typeColors[typeName] || '#94a3b8'
-        });
-    });
-
-    // Render tree
-    let html = '';
-
-    // Group by depth and render
-    for (let d = 0; d <= maxDepth; d++) {
-        const nodes = tree[d] || [];
-        if (nodes.length === 0) continue;
-
-        const groupedByParent = {};
-        nodes.forEach(n => {
-            const parts = n.path.split('\\\\');
-            const parentPath = parts.slice(0, -1).join('\\\\') || 'ROOT';
-            if (!groupedByParent[parentPath]) groupedByParent[parentPath] = [];
-            groupedByParent[parentPath].push(n);
-        });
-
-        Object.entries(groupedByParent).forEach(([parent, children]) => {
-            children.sort((a, b) => b.children - a.children);
-        });
-
-        tree[d] = nodes;
-    }
-
-    // Render as nested HTML
-    function renderNode(node, indent = 0) {
-        const margin = indent * 20;
-        return `
-            <div class="hierarchy-tree-node" style="margin-left: ${margin}px; padding: 4px 8px; cursor: pointer; border-radius: 4px;"
-                 onclick="loadHierarchyNodeDetail('${node.path.replace(/'/g, "\\'")}', '${node.name.replace(/'/g, "\\'")}')"
-                 onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                <span class="node-icon" style="background: ${node.color}"></span>
-                <span class="text-sm">${node.name}</span>
-                <span class="badge" style="background: ${node.color}22; color: ${node.color}; margin-left: 8px;">${node.type}</span>
-                ${node.children > 0 ? `<span class="text-xs text-gray-500 ml-2">(${node.children})</span>` : ''}
-            </div>`;
-    }
-
-    // Simple flat render with indentation
-    const allNodes = [];
-    data.results.forEach(row => {
-        const path = row.path;
-        const parts = path.split('\\\\');
-        if (parts.length > maxDepth + 1) return;
-
-        const typeName = row.type.split('#').pop();
-        allNodes.push({
-            path: path,
-            name: row.name,
-            type: typeName,
-            children: parseInt(row.children) || 0,
-            color: typeColors[typeName] || '#94a3b8',
-            depth: parts.length - 1
-        });
-    });
-
-    // Sort by path to maintain hierarchy order
-    allNodes.sort((a, b) => a.path.localeCompare(b.path));
-
-    html = allNodes.map(n => renderNode(n, n.depth)).join('');
-
-    container.innerHTML = html || '<p class="text-gray-500">No hierarchy data found</p>';
+    hierarchyDrillData = buildHierarchyDrillData(data.results, maxDepth);
+    renderSystemPathTree();
 }
 
 async function loadHierarchyNodeDetail(path, name) {
     const container = document.getElementById('hierarchy-details');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading elements...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading elements for this path...</div>';
 
     // Query elements in this path (including original CSV Level)
     const query = `
@@ -1803,7 +2137,7 @@ LIMIT 50`;
     let html = `<h4 class="text-sm font-semibold text-blue-400 mb-3">${name} <span class="text-xs text-gray-500">(${path})</span></h4>`;
 
     if (!data || !data.results || data.results.length === 0) {
-        html += '<p class="text-gray-500 text-sm">No elements found in this path.</p>';
+        html += '<p class="text-gray-500 text-sm">No elements found in this path. Try a higher-level node.</p>';
     } else {
         // Level distribution summary
         const levelCounts = {};
@@ -1838,194 +2172,499 @@ LIMIT 50`;
     container.innerHTML = html;
 }
 
-async function loadNavisHierarchyTree() {
-    const container = document.getElementById('navis-tree-view');
-    const maxDepth = parseInt(document.getElementById('navis-depth').value);
+// ── Navis Miller Columns Drill-down ──
 
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Building tree...</div>';
+let navisDrillData = null;
+let navisDrillState = { selectedUris: [] };
+let navisSelectedUri = null;
+const NAVIS_LEVEL_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#a855f7'];
 
-    // Query nodes with parent-child relationships (using hasChildCount/hasDescendantCount)
-    const query = `
-PREFIX navis: <http://example.org/bim-ontology/navis#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?node ?name ?level ?parent ?children ?descendants
-WHERE {
-    ?node navis:hasLevel ?level ;
-          rdfs:label ?name .
-    FILTER(?level <= ${maxDepth})
-    OPTIONAL { ?node navis:hasParent ?parent }
-    OPTIONAL { ?node navis:hasChildCount ?children }
-    OPTIONAL { ?node navis:hasDescendantCount ?descendants }
+function resetNavisDrilldown() {
+    navisDrillState.selectedUris = [];
+    navisSelectedUri = null;
+    renderNavisDrilldown();
+    document.getElementById('navis-aggregation-card').style.display = 'none';
+    document.getElementById('navis-graph-card').style.display = 'none';
+    const details = document.getElementById('hierarchy-details');
+    if (details) details.innerHTML = '<p class="text-gray-500 text-sm">Select a node from the tree to view details.</p>';
 }
-ORDER BY ?level ?name
-LIMIT 500`;
 
-    const data = await apiPost('/api/sparql', { query });
-
-    if (!data || !data.results || data.results.length === 0) {
-        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy</p>';
-        return;
-    }
-
-    // Build tree structure from parent-child relationships
-    const nodes = {};
+function buildNavisDrillData(rows) {
+    const nodesByUri = new Map();
+    const childrenByUri = new Map();
     const roots = [];
 
-    // First pass: create all nodes
-    data.results.forEach(row => {
-        const nodeUri = row.node;
-        const nodeId = nodeUri.split('/').pop();
-        nodes[nodeUri] = {
-            id: nodeId,
-            uri: nodeUri,
+    rows.forEach(row => {
+        const uri = row.node;
+        nodesByUri.set(uri, {
+            uri,
             name: row.name,
             level: parseInt(row.level) || 0,
             parentUri: row.parent || null,
-            children: parseInt(row.children) || 0,
+            childCount: parseInt(row.children) || 0,
             descendants: parseInt(row.descendants) || 0,
-            childNodes: []
-        };
+        });
     });
 
-    // Second pass: build tree structure
-    Object.values(nodes).forEach(node => {
-        if (node.parentUri && nodes[node.parentUri]) {
-            nodes[node.parentUri].childNodes.push(node);
-        } else if (node.level === 0) {
+    nodesByUri.forEach(node => {
+        if (node.parentUri && nodesByUri.has(node.parentUri)) {
+            if (!childrenByUri.has(node.parentUri)) childrenByUri.set(node.parentUri, []);
+            childrenByUri.get(node.parentUri).push(node);
+        } else {
             roots.push(node);
         }
     });
 
-    // Sort children by descendant count (descending)
-    const sortChildren = (node) => {
-        node.childNodes.sort((a, b) => b.descendants - a.descendants);
-        node.childNodes.forEach(sortChildren);
-    };
-    roots.forEach(sortChildren);
+    const sortNodes = list => list.sort((a, b) => b.descendants - a.descendants || a.name.localeCompare(b.name));
+    sortNodes(roots);
+    childrenByUri.forEach(sortNodes);
 
-    // Render tree
-    const levelColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+    return { nodesByUri, childrenByUri, roots };
+}
 
-    function renderNode(node, depth = 0) {
-        const color = levelColors[Math.min(node.level, levelColors.length - 1)];
-        const margin = depth * 20;
-        const hasChildren = node.childNodes.length > 0 || node.children > 0;
-        const displayName = node.name.length > 40 ? node.name.substring(0, 40) + '...' : node.name;
+function renderNavisDrilldown() {
+    const container = document.getElementById('navis-tree-view');
+    const breadcrumb = document.getElementById('navis-breadcrumb');
+    if (!container || !breadcrumb) return;
 
-        let html = `
-            <div class="hierarchy-tree-node" style="margin-left: ${margin}px; padding: 4px 8px; cursor: pointer; border-radius: 4px;"
-                 onclick="loadNavisNodeDetail('${node.uri.replace(/'/g, "\\'")}')"
-                 onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                <span class="node-icon" style="background: ${color}"></span>
-                <span class="text-sm">${displayName}</span>
-                <span class="badge" style="background: ${color}22; color: ${color}; margin-left: 8px;">L${node.level}</span>
-                ${node.children > 0 ? `<span class="text-xs text-gray-400 ml-2">(${node.children} direct)</span>` : ''}
-                ${node.descendants > 0 ? `<span class="text-xs text-green-400 ml-1">[${node.descendants.toLocaleString()} total]</span>` : ''}
-            </div>`;
+    container.innerHTML = '';
+    breadcrumb.innerHTML = '';
 
-        // Render children
-        node.childNodes.forEach(child => {
-            html += renderNode(child, depth + 1);
-        });
-
-        return html;
+    if (!navisDrillData || navisDrillData.roots.length === 0) {
+        container.innerHTML = '<div class="miller-empty">No nodes found. Load a file or increase depth.</div>';
+        return;
     }
 
-    let html = '';
-    roots.forEach(root => {
-        html += renderNode(root, 0);
+    // Build columns: root + each selected level
+    const columns = [{ label: 'Root', nodes: navisDrillData.roots, parentUri: null }];
+    navisDrillState.selectedUris.forEach((uri, idx) => {
+        const children = navisDrillData.childrenByUri.get(uri) || [];
+        const node = navisDrillData.nodesByUri.get(uri);
+        columns.push({ label: node ? node.name : `Level ${idx + 2}`, nodes: children, parentUri: uri });
     });
 
-    container.innerHTML = html || '<p class="text-gray-500">No hierarchy data found</p>';
+    const totalCols = columns.length;
+    // Wider last column, narrower previous ones
+    columns.forEach((col, colIdx) => {
+        const colEl = document.createElement('div');
+        colEl.className = 'miller-column';
+        const isLast = colIdx === totalCols - 1;
+        const width = isLast ? Math.max(260, 400 - (totalCols - 1) * 20) : Math.max(140, 220 - (totalCols - 1) * 15);
+        colEl.style.flex = isLast ? '1 0 260px' : `0 0 ${width}px`;
+        colEl.style.minWidth = `${Math.max(140, width)}px`;
+
+        const header = document.createElement('div');
+        header.className = 'miller-column-header';
+        const node = colIdx > 0 ? navisDrillData.nodesByUri.get(navisDrillState.selectedUris[colIdx - 1]) : null;
+        header.textContent = colIdx === 0 ? 'Root' : (node ? `L${node.level} - ${node.name.substring(0, 20)}` : `Level ${colIdx}`);
+        colEl.appendChild(header);
+
+        const list = document.createElement('div');
+        list.className = 'miller-column-list';
+
+        if (!col.nodes || col.nodes.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'miller-empty';
+            empty.textContent = 'No children (leaf level)';
+            list.appendChild(empty);
+        } else {
+            col.nodes.forEach(n => {
+                const item = document.createElement('div');
+                item.className = 'miller-item';
+                if (navisDrillState.selectedUris[colIdx] === n.uri) item.classList.add('selected');
+
+                const color = NAVIS_LEVEL_COLORS[Math.min(n.level, NAVIS_LEVEL_COLORS.length - 1)];
+
+                const icon = document.createElement('span');
+                icon.className = 'node-icon';
+                icon.style.background = color;
+
+                const name = document.createElement('span');
+                name.className = 'miller-name';
+                name.textContent = n.name || 'Unnamed';
+                name.title = n.name;
+
+                const badge = document.createElement('span');
+                badge.className = 'badge';
+                badge.style.background = `${color}22`;
+                badge.style.color = color;
+                badge.textContent = `L${n.level}`;
+
+                const count = document.createElement('span');
+                count.className = 'text-xs text-gray-500';
+                count.textContent = n.descendants > 0 ? `(${n.descendants.toLocaleString()})` : n.childCount > 0 ? `(${n.childCount})` : '';
+
+                item.appendChild(icon);
+                item.appendChild(name);
+                item.appendChild(badge);
+                if (count.textContent) item.appendChild(count);
+
+                item.addEventListener('click', () => selectNavisNode(colIdx, n.uri));
+                list.appendChild(item);
+            });
+        }
+
+        colEl.appendChild(list);
+        container.appendChild(colEl);
+    });
+
+    // Scroll to last column
+    requestAnimationFrame(() => container.scrollLeft = container.scrollWidth);
+
+    // Update breadcrumb
+    const rootCrumb = document.createElement('span');
+    rootCrumb.className = 'crumb';
+    rootCrumb.textContent = 'Root';
+    rootCrumb.addEventListener('click', () => resetNavisDrilldown());
+    breadcrumb.appendChild(rootCrumb);
+
+    navisDrillState.selectedUris.forEach((uri, idx) => {
+        const sep = document.createElement('span');
+        sep.className = 'crumb-sep';
+        sep.textContent = '>';
+        breadcrumb.appendChild(sep);
+
+        const node = navisDrillData.nodesByUri.get(uri);
+        const crumb = document.createElement('span');
+        crumb.className = 'crumb';
+        crumb.textContent = node ? node.name.substring(0, 25) : 'Unknown';
+        crumb.title = node ? node.name : '';
+        crumb.addEventListener('click', () => {
+            navisDrillState.selectedUris = navisDrillState.selectedUris.slice(0, idx + 1);
+            navisSelectedUri = uri;
+            renderNavisDrilldown();
+            loadNavisNodeDetail(uri);
+            loadNavisAggregation();
+        });
+        breadcrumb.appendChild(crumb);
+    });
+}
+
+function selectNavisNode(colIdx, uri) {
+    navisDrillState.selectedUris = navisDrillState.selectedUris.slice(0, colIdx);
+    navisDrillState.selectedUris[colIdx] = uri;
+    navisSelectedUri = uri;
+    renderNavisDrilldown();
+    loadNavisNodeDetail(uri);
+    loadNavisAggregation();
+}
+
+async function loadNavisHierarchyTree() {
+    const container = document.getElementById('navis-tree-view');
+    const depthValue = coerceInt(document.getElementById('navis-depth')?.value);
+    const maxDepth = depthValue || metadataCache.maxLevel || DEFAULT_MAX_LEVEL;
+
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading Navisworks hierarchy...</div>';
+
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?node ?name ?level ?parent ?children ?descendants WHERE {
+    ?node navis:hasLevel ?level ; rdfs:label ?name .
+    FILTER(?level <= ${maxDepth})
+    OPTIONAL { ?node navis:hasParent ?parent }
+    OPTIONAL { ?node navis:hasChildCount ?children }
+    OPTIONAL { ?node navis:hasDescendantCount ?descendants }
+    FILTER(BOUND(?parent) || BOUND(?children))
+} ORDER BY ?level ?name LIMIT 2000`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    if (!data || !data.results || data.results.length === 0) {
+        container.innerHTML = '<div class="miller-empty">No Navisworks nodes found. Try increasing depth or select another file.</div>';
+        return;
+    }
+
+    navisDrillData = buildNavisDrillData(data.results);
+    navisDrillState.selectedUris = [];
+    navisSelectedUri = null;
+    renderNavisDrilldown();
 }
 
 async function loadNavisNodeDetail(nodeUri) {
     const container = document.getElementById('hierarchy-details');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading children...</div>';
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading node details...</div>';
 
-    // Query direct children of this node
     const query = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bim: <http://example.org/bim-ontology/schema#>
-
-SELECT ?name ?level ?category ?children ?descendants
-WHERE {
-    ?child navis:hasParent <${nodeUri}> ;
-           rdfs:label ?name ;
-           navis:hasLevel ?level .
+SELECT ?name ?level ?category ?children ?descendants WHERE {
+    ?child navis:hasParent <${nodeUri}> ; rdfs:label ?name ; navis:hasLevel ?level .
     OPTIONAL { ?child bim:hasCategory ?category }
     OPTIONAL { ?child navis:hasChildCount ?children }
     OPTIONAL { ?child navis:hasDescendantCount ?descendants }
-}
-ORDER BY DESC(?descendants) ?name
-LIMIT 100`;
+} ORDER BY DESC(?descendants) ?name LIMIT 100`;
 
     const data = await apiPost('/api/sparql', { query });
 
-    // Get parent node info
     const parentQuery = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?name ?level ?children ?descendants
-WHERE {
-    <${nodeUri}> rdfs:label ?name ;
-                 navis:hasLevel ?level .
+SELECT ?name ?level ?children ?descendants WHERE {
+    <${nodeUri}> rdfs:label ?name ; navis:hasLevel ?level .
     OPTIONAL { <${nodeUri}> navis:hasChildCount ?children }
     OPTIONAL { <${nodeUri}> navis:hasDescendantCount ?descendants }
 }`;
     const parentData = await apiPost('/api/sparql', { query: parentQuery });
 
-    let parentName = nodeUri.split('/').pop();
-    let parentLevel = '?';
-    let parentChildren = 0;
-    let parentDescendants = 0;
-
-    if (parentData && parentData.results && parentData.results.length > 0) {
-        parentName = parentData.results[0].name;
-        parentLevel = parentData.results[0].level;
-        parentChildren = parseInt(parentData.results[0].children) || 0;
-        parentDescendants = parseInt(parentData.results[0].descendants) || 0;
+    let pName = nodeUri.split('/').pop(), pLevel = '?', pChildren = 0, pDesc = 0;
+    if (parentData?.results?.[0]) {
+        const r = parentData.results[0];
+        pName = r.name; pLevel = r.level;
+        pChildren = parseInt(r.children) || 0; pDesc = parseInt(r.descendants) || 0;
     }
 
-    let html = `
-        <h4 class="text-sm font-semibold text-blue-400 mb-2">
-            ${parentName}
-            <span class="badge badge-purple ml-2">L${parentLevel}</span>
-            <span class="text-xs text-gray-400 ml-2">(${parentChildren} direct, ${parentDescendants.toLocaleString()} total descendants)</span>
-        </h4>`;
+    let html = `<h4 class="text-sm font-semibold text-blue-400 mb-2">${pName}
+        <span class="badge badge-purple ml-2">L${pLevel}</span>
+        <span class="text-xs text-gray-400 ml-2">(${pChildren} direct, ${pDesc.toLocaleString()} total)</span></h4>`;
 
-    if (!data || !data.results || data.results.length === 0) {
-        html += '<p class="text-gray-500 text-sm">No children found (leaf node).</p>';
+    if (!data?.results?.length) {
+        html += '<p class="text-gray-500 text-sm">Leaf node - no children.</p>';
     } else {
         html += '<table><thead><tr><th>Name</th><th>Level</th><th>Category</th><th>Direct</th><th>Total</th></tr></thead><tbody>';
-        data.results.forEach(row => {
-            const children = parseInt(row.children) || 0;
-            const descendants = parseInt(row.descendants) || 0;
-            html += `<tr>
-                <td class="text-sm">${row.name || '-'}</td>
-                <td><span class="badge badge-purple">L${row.level}</span></td>
-                <td><span class="badge badge-blue">${row.category || '-'}</span></td>
-                <td class="text-right">${children}</td>
-                <td class="text-right text-green-400">${descendants.toLocaleString()}</td>
-            </tr>`;
+        data.results.forEach(r => {
+            html += `<tr><td class="text-sm">${r.name || '-'}</td>
+                <td><span class="badge badge-purple">L${r.level}</span></td>
+                <td><span class="badge badge-blue">${r.category || '-'}</span></td>
+                <td class="text-right">${parseInt(r.children) || 0}</td>
+                <td class="text-right text-green-400">${(parseInt(r.descendants) || 0).toLocaleString()}</td></tr>`;
         });
         html += '</tbody></table>';
+    }
+    container.innerHTML = html;
+}
+
+// ── Property Aggregation ──
+
+async function loadNavisAggregation() {
+    if (!navisSelectedUri) return;
+    const card = document.getElementById('navis-aggregation-card');
+    const container = document.getElementById('navis-aggregation');
+    const title = document.getElementById('navis-agg-title');
+    card.style.display = 'block';
+
+    const node = navisDrillData?.nodesByUri.get(navisSelectedUri);
+    title.textContent = `Property Summary: ${node ? node.name : 'Selected Node'}`;
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Aggregating properties...</div>';
+
+    let html = '';
+
+    // 1) Subtree summary: category & status breakdown of descendants
+    const subtreeQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX bim: <http://example.org/bim-ontology/schema#>
+PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?category (COUNT(?obj) as ?count) (SAMPLE(?status) as ?sampleStatus) WHERE {
+    ?obj navis:hasParent* <${navisSelectedUri}> .
+    OPTIONAL { ?obj bim:hasCategory ?category }
+    OPTIONAL { ?obj sp3d:hasStatus ?status }
+} GROUP BY ?category ORDER BY DESC(?count) LIMIT 20`;
+
+    const subtreeData = await apiPost('/api/sparql', { query: subtreeQuery });
+
+    if (subtreeData?.results?.length) {
+        const total = subtreeData.results.reduce((s, r) => s + (parseInt(r.count) || 0), 0);
+        html += '<div class="mb-4"><h5 class="text-xs text-gray-400 mb-2">Subtree Breakdown (' + total.toLocaleString() + ' objects)</h5>';
+        html += '<table><thead><tr><th>Category</th><th>Count</th><th>%</th><th>Sample Status</th></tr></thead><tbody>';
+        subtreeData.results.forEach(r => {
+            const cnt = parseInt(r.count) || 0;
+            const pct = total > 0 ? ((cnt / total) * 100).toFixed(1) : '0';
+            html += `<tr><td><span class="badge badge-blue">${r.category || 'N/A'}</span></td>
+                <td class="text-right">${cnt.toLocaleString()}</td>
+                <td class="text-right text-gray-400">${pct}%</td>
+                <td class="text-xs text-gray-400">${r.sampleStatus || '-'}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+
+    // 2) Status breakdown for subtree
+    const statusQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
+SELECT ?status (COUNT(?obj) as ?count) WHERE {
+    ?obj navis:hasParent* <${navisSelectedUri}> ;
+         sp3d:hasStatus ?status .
+} GROUP BY ?status ORDER BY DESC(?count)`;
+
+    const statusData = await apiPost('/api/sparql', { query: statusQuery });
+
+    if (statusData?.results?.length) {
+        html += '<div class="mb-4"><h5 class="text-xs text-gray-400 mb-2">Status Distribution</h5>';
+        html += '<div class="flex flex-wrap gap-2">';
+        statusData.results.forEach(r => {
+            const cnt = parseInt(r.count) || 0;
+            const colorMap = { Working: '#4ade80', Approved: '#60a5fa', 'For Review': '#fbbf24' };
+            const color = colorMap[r.status] || '#94a3b8';
+            html += `<span class="badge" style="background:${color}22;color:${color}">${r.status}: ${cnt.toLocaleString()}</span>`;
+        });
+        html += '</div></div>';
+    }
+
+    // 3) PropertyValue pattern aggregation (v3 file only)
+    const propQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX prop: <http://example.org/bim-ontology/property#>
+SELECT ?category ?propName (COUNT(?pv) as ?count) (SAMPLE(?raw) as ?sampleValue) WHERE {
+    ?obj navis:hasParent* <${navisSelectedUri}> .
+    ?obj prop:hasProperty ?pv .
+    ?pv prop:propertyName ?propName .
+    ?pv prop:rawValue ?raw .
+    OPTIONAL { ?pv prop:category ?category }
+} GROUP BY ?category ?propName ORDER BY ?category ?propName LIMIT 50`;
+
+    const propData = await apiPost('/api/sparql', { query: propQuery });
+
+    if (propData?.results?.length) {
+        const categories = {};
+        propData.results.forEach(r => {
+            const cat = r.category || 'Other';
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push({ name: r.propName, count: parseInt(r.count) || 0, sample: r.sampleValue });
+        });
+
+        html += '<h5 class="text-xs text-gray-400 mb-2">Property Values (Reified)</h5>';
+        html += '<div class="grid grid-cols-2 gap-4">';
+        Object.entries(categories).forEach(([cat, props]) => {
+            html += `<div class="card"><div class="card-header text-xs">${cat}</div><div class="card-body">`;
+            html += '<table><thead><tr><th>Property</th><th>Count</th><th>Sample</th></tr></thead><tbody>';
+            props.forEach(p => {
+                html += `<tr><td class="text-xs">${p.name}</td><td class="text-right">${p.count}</td><td class="text-xs text-green-400">${p.sample || '-'}</td></tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        });
+        html += '</div>';
+    }
+
+    if (!html) {
+        html = '<p class="text-gray-500 text-sm">No property data found for this subtree.</p>';
     }
 
     container.innerHTML = html;
 }
 
+// ── Graph Toggle ──
+
+function toggleNavisGraph() {
+    const card = document.getElementById('navis-graph-card');
+    const btn = document.getElementById('navis-graph-btn');
+    if (card.style.display === 'none') {
+        card.style.display = 'block';
+        btn.textContent = 'Hide Graph';
+        renderNavisGraph();
+    } else {
+        card.style.display = 'none';
+        btn.textContent = 'Show Graph';
+    }
+}
+
+function renderNavisGraph() {
+    const canvas = document.getElementById('navis-graph-canvas');
+    if (!canvas || !navisDrillData) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Simple tree graph: show selected path + children
+    const nodesToDraw = [];
+    const edges = [];
+
+    // Add roots
+    const displayNodes = navisDrillState.selectedUris.length > 0
+        ? [navisDrillState.selectedUris[navisDrillState.selectedUris.length - 1]]
+        : navisDrillData.roots.slice(0, 5).map(n => n.uri);
+
+    displayNodes.forEach(uri => {
+        const node = navisDrillData.nodesByUri.get(uri);
+        if (!node) return;
+        nodesToDraw.push({ ...node, x: 0, y: 0 });
+
+        const children = navisDrillData.childrenByUri.get(uri) || [];
+        children.slice(0, 12).forEach(child => {
+            nodesToDraw.push({ ...child, x: 0, y: 0 });
+            edges.push({ from: uri, to: child.uri });
+        });
+    });
+
+    if (nodesToDraw.length === 0) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('Select a node to view graph', 20, 30);
+        return;
+    }
+
+    // Layout: parent center, children in arc below
+    const centerX = canvas.width / 2;
+    const centerY = 60;
+    const parent = nodesToDraw[0];
+    parent.x = centerX;
+    parent.y = centerY;
+
+    const childNodes = nodesToDraw.slice(1);
+    const radius = Math.min(canvas.width * 0.4, 250);
+    childNodes.forEach((child, i) => {
+        const angle = Math.PI * (0.2 + 0.6 * i / Math.max(childNodes.length - 1, 1));
+        child.x = centerX + radius * Math.cos(angle) * (i % 2 === 0 ? 1 : -1) * ((i + 1) / childNodes.length);
+        child.y = centerY + 80 + radius * Math.sin(angle) * 0.8;
+    });
+
+    // Draw edges
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    edges.forEach(e => {
+        const from = nodesToDraw.find(n => n.uri === e.from);
+        const to = nodesToDraw.find(n => n.uri === e.to);
+        if (from && to) {
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+        }
+    });
+
+    // Draw nodes
+    nodesToDraw.forEach((n, i) => {
+        const color = NAVIS_LEVEL_COLORS[Math.min(n.level, NAVIS_LEVEL_COLORS.length - 1)];
+        const r = i === 0 ? 20 : 12;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = i === 0 ? 'bold 12px sans-serif' : '10px sans-serif';
+        ctx.textAlign = 'center';
+        const label = n.name.length > 18 ? n.name.substring(0, 18) + '..' : n.name;
+        ctx.fillText(label, n.x, n.y + r + 14);
+
+        if (n.descendants > 0) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '9px sans-serif';
+            ctx.fillText(`(${n.descendants.toLocaleString()})`, n.x, n.y + r + 26);
+        }
+    });
+}
+
 function initHierarchyTab() {
+    updateDepthSelectors(metadataCache.maxLevel);
     loadHierarchyFiles();
     loadHierarchyComparison();
     loadLevelDistribution();
     loadHierarchyTree();
+    loadNavisHierarchyTree();
 }
 
 // ── Init ──
 
 initQueryTemplates();
 checkHealth();
+loadOverviewFiles();
 loadOverview();
+loadMaxLevel();
+ensureTabState('overview').initialized = true;

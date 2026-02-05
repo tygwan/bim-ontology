@@ -59,5 +59,21 @@ htmlcov/
 # Generated reports
 VALIDATION-REPORT.md
 
+# Internal development documents (not for public)
+docs/DEVLOG*.md
+docs/PROGRESS*.md
+docs/PROJECT-STATUS-REPORT*.md
+docs/RETROSPECTIVE*.md
+docs/PLAN-*.md
+docs/*RESEARCH*.md
+docs/phases/**/TASKS.md
+docs/phases/**/CHECKLIST.md
+
+# PoC and benchmark scripts (local experiments)
+scripts/poc_*.py
+scripts/benchmark_*.py
+scripts/load_test.py
+scripts/query_*.py
+
 # Node (if any)
 node_modules/

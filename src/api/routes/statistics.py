@@ -71,3 +71,43 @@ async def category_statistics():
 async def building_hierarchy():
     results = execute_sparql(get_building_hierarchy())
     return results
+
+
+@router.get(
+    "/statistics/metadata",
+    summary="RDF 메타데이터 조회 (최대 레벨, 오브젝트 수, 속성 수)",
+)
+async def graph_metadata():
+    """Navis CSV 기반 RDF의 메타데이터를 반환합니다."""
+    query = '''
+    PREFIX navis: <http://example.org/bim-ontology/navis#>
+    SELECT ?maxLevel ?totalObjects ?totalProps WHERE {
+        ?meta navis:maxHierarchyLevel ?maxLevel .
+        OPTIONAL { ?meta navis:totalObjects ?totalObjects }
+        OPTIONAL { ?meta navis:totalPropertyValues ?totalProps }
+    }
+    '''
+    results = execute_sparql(query)
+    if results:
+        r = results[0]
+        return {
+            "maxLevel": r.get("maxLevel"),
+            "totalObjects": r.get("totalObjects"),
+            "totalPropertyValues": r.get("totalProps"),
+        }
+    # Fallback: estimate from data
+    count_query = '''
+    PREFIX navis: <http://example.org/bim-ontology/navis#>
+    SELECT (MAX(?level) as ?maxLevel) (COUNT(DISTINCT ?obj) as ?totalObjects) WHERE {
+        ?obj navis:hasLevel ?level .
+    }
+    '''
+    fallback = execute_sparql(count_query)
+    if fallback:
+        fb = fallback[0]
+        return {
+            "maxLevel": fb.get("maxLevel"),
+            "totalObjects": fb.get("totalObjects"),
+            "totalPropertyValues": None,
+        }
+    return {"maxLevel": None, "totalObjects": None, "totalPropertyValues": None}

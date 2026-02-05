@@ -3,10 +3,11 @@
 dxtnavis에서 추출한 AllHierarchy CSV와 Schedule CSV를 RDF로 변환합니다.
 IFC 중간 단계 없이 원본 데이터의 풍부한 속성을 보존합니다.
 
-MVP v2 구현:
+MVP v3 구현:
 - AllHierarchy.csv → 계층 구조 + 속성 + SmartPlant 3D 정보
 - System Path 기반 실제 계층 구조 생성 (Area → Unit → Equipment)
 - schedule.csv → ConstructionTask + 요소 연결
+- 모든 CSV 속성을 Property-Value 패턴으로 저장 (Category, PropertyName, RawValue, DataType, Unit)
 """
 
 import csv
@@ -25,6 +26,7 @@ INST = Namespace("http://example.org/bim-ontology/instance#")
 NAVIS = Namespace("http://example.org/bim-ontology/navis#")
 SP3D = Namespace("http://example.org/bim-ontology/sp3d#")
 SCHED = Namespace("http://example.org/bim-ontology/schedule#")
+PROP = Namespace("http://example.org/bim-ontology/property#")  # Property-Value 패턴용
 
 
 class NavisToRDFConverter:
@@ -84,6 +86,7 @@ class NavisToRDFConverter:
         self.graph.bind("navis", NAVIS)
         self.graph.bind("sp3d", SP3D)
         self.graph.bind("sched", SCHED)
+        self.graph.bind("prop", PROP)
         self.graph.bind("rdf", RDF)
         self.graph.bind("rdfs", RDFS)
         self.graph.bind("owl", OWL)
@@ -148,6 +151,23 @@ class NavisToRDFConverter:
         for name, (prop, _) in self.SP3D_PROPERTY_MAP.items():
             self.graph.add((prop, RDF.type, OWL.DatatypeProperty))
             self.graph.add((prop, RDFS.label, Literal(f"SP3D {name}")))
+
+        # Property-Value 패턴용 스키마 (모든 CSV 속성 저장)
+        self.graph.add((PROP.PropertyValue, RDF.type, OWL.Class))
+        self.graph.add((PROP.PropertyValue, RDFS.label, Literal("Property Value")))
+        self.graph.add((PROP.PropertyValue, RDFS.comment, Literal("CSV 속성값을 저장하는 클래스")))
+
+        prop_schema = [
+            (PROP.hasProperty, "Has Property", OWL.ObjectProperty),
+            (PROP.category, "Category", OWL.DatatypeProperty),
+            (PROP.propertyName, "Property Name", OWL.DatatypeProperty),
+            (PROP.rawValue, "Raw Value", OWL.DatatypeProperty),
+            (PROP.dataType, "Data Type", OWL.DatatypeProperty),
+            (PROP.unit, "Unit", OWL.DatatypeProperty),
+        ]
+        for prop, label, prop_type in prop_schema:
+            self.graph.add((prop, RDF.type, prop_type))
+            self.graph.add((prop, RDFS.label, Literal(label)))
 
     def _classify_element(self, display_name: str, internal_type: str) -> URIRef:
         """요소 이름과 타입을 기반으로 BIM 카테고리를 분류한다."""
@@ -262,6 +282,8 @@ class NavisToRDFConverter:
             "groups": 0,
             "path_nodes": 0,
             "triples_added": 0,
+            "property_values": 0,  # Property-Value 노드 수
+            "max_level": 0,  # 최대 계층 깊이
             "categories": {},
         }
 
@@ -285,18 +307,21 @@ class NavisToRDFConverter:
                         "display_name": row.get("DisplayName", ""),
                         "properties": {},
                         "sp3d_properties": {},
+                        "all_properties": [],  # 모든 속성 저장 (Property-Value 패턴용)
                         "internal_type": "",
                     }
 
                 category = row.get("Category", "")
                 prop_name = row.get("PropertyName", "")
                 raw_value = row.get("RawValue", "")
+                data_type = row.get("DataType", "")
+                unit = row.get("Unit", "")
 
                 # 항목 카테고리에서 내부 타입 추출
                 if category == "항목" and prop_name == "내부 유형":
                     objects[obj_id]["internal_type"] = raw_value
 
-                # SmartPlant 3D 속성 수집
+                # SmartPlant 3D 속성 수집 (기존 호환성 유지)
                 if category == "SmartPlant 3D":
                     objects[obj_id]["sp3d_properties"][prop_name] = raw_value
 
@@ -305,6 +330,16 @@ class NavisToRDFConverter:
                     if category not in objects[obj_id]["properties"]:
                         objects[obj_id]["properties"][category] = {}
                     objects[obj_id]["properties"][category][prop_name] = raw_value
+
+                # 모든 속성을 Property-Value 패턴으로 저장 (RawValue가 있는 경우만)
+                if raw_value:
+                    objects[obj_id]["all_properties"].append({
+                        "category": category,
+                        "name": prop_name,
+                        "raw_value": raw_value,
+                        "data_type": data_type,
+                        "unit": unit,
+                    })
 
         stats["unique_objects"] = len(objects)
         logger.info(f"Found {len(objects)} unique objects")
@@ -331,7 +366,12 @@ class NavisToRDFConverter:
             self.graph.add((uri, NAVIS.hasObjectId, Literal(obj_id)))
             self.graph.add((uri, BIM.hasName, Literal(obj_data["display_name"])))
             self.graph.add((uri, RDFS.label, Literal(obj_data["display_name"])))
-            self.graph.add((uri, NAVIS.hasLevel, Literal(int(obj_data["level"]), datatype=XSD.integer)))
+            level = int(obj_data["level"])
+            self.graph.add((uri, NAVIS.hasLevel, Literal(level, datatype=XSD.integer)))
+
+            # 최대 레벨 추적
+            if level > stats["max_level"]:
+                stats["max_level"] = level
 
             if obj_data["internal_type"]:
                 self.graph.add((uri, NAVIS.hasInternalType, Literal(obj_data["internal_type"])))
@@ -352,11 +392,30 @@ class NavisToRDFConverter:
                 self.graph.add((parent_uri, NAVIS.hasChild, uri))
                 self.graph.add((uri, NAVIS.hasParentId, Literal(parent_id)))
 
-            # SmartPlant 3D 속성
+            # SmartPlant 3D 속성 (기존 방식 - 호환성)
             for prop_name, prop_value in obj_data["sp3d_properties"].items():
                 if prop_name in self.SP3D_PROPERTY_MAP and prop_value:
                     prop_uri, datatype = self.SP3D_PROPERTY_MAP[prop_name]
                     self.graph.add((uri, prop_uri, Literal(prop_value, datatype=datatype)))
+
+            # 모든 속성을 Property-Value 패턴으로 저장 (동적 조회 지원)
+            for idx, prop_data in enumerate(obj_data.get("all_properties", [])):
+                # PropertyValue 노드 URI 생성
+                prop_node_id = f"{obj_id}_{idx}".replace("-", "_")
+                prop_node = INST[f"prop_{prop_node_id}"]
+
+                self.graph.add((prop_node, RDF.type, PROP.PropertyValue))
+                self.graph.add((uri, PROP.hasProperty, prop_node))
+                self.graph.add((prop_node, PROP.category, Literal(prop_data["category"])))
+                self.graph.add((prop_node, PROP.propertyName, Literal(prop_data["name"])))
+                self.graph.add((prop_node, PROP.rawValue, Literal(prop_data["raw_value"])))
+
+                if prop_data["data_type"]:
+                    self.graph.add((prop_node, PROP.dataType, Literal(prop_data["data_type"])))
+                if prop_data["unit"]:
+                    self.graph.add((prop_node, PROP.unit, Literal(prop_data["unit"])))
+
+                stats["property_values"] += 1
 
             # System Path 기반 계층 연결 + 카운트
             system_path = obj_data["sp3d_properties"].get("System Path", "")
@@ -399,7 +458,16 @@ class NavisToRDFConverter:
         stats["path_nodes"] = len(self._path_node_cache)
         stats["hierarchy_nodes"] = sum(1 for c in self._child_counts.values() if c > 0)
         stats["triples_added"] = len(self.graph) - initial_triples
-        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes, {stats['hierarchy_nodes']} hierarchy nodes")
+
+        # 그래프 메타데이터에 최대 깊이 저장
+        graph_uri = URIRef("http://example.org/bim-ontology/graph#metadata")
+        self.graph.add((graph_uri, RDF.type, OWL.NamedIndividual))
+        self.graph.add((graph_uri, NAVIS.maxHierarchyLevel, Literal(stats["max_level"], datatype=XSD.integer)))
+        self.graph.add((graph_uri, NAVIS.totalObjects, Literal(stats["unique_objects"], datatype=XSD.integer)))
+        self.graph.add((graph_uri, NAVIS.totalPropertyValues, Literal(stats["property_values"], datatype=XSD.integer)))
+
+        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes")
+        logger.info(f"Max hierarchy level: {stats['max_level']}, Property values: {stats['property_values']}")
 
         return stats
 
@@ -572,6 +640,8 @@ if __name__ == "__main__":
     print(f"SP3D entities: {result['hierarchy']['sp3d_entities']}")
     print(f"Groups: {result['hierarchy']['groups']}")
     print(f"System Path nodes: {result['hierarchy'].get('path_nodes', 0)}")
+    print(f"Property values: {result['hierarchy'].get('property_values', 0)}")
+    print(f"Max hierarchy level: {result['hierarchy'].get('max_level', 0)}")
     print(f"\nCategories:")
     for cat, count in sorted(result['hierarchy']['categories'].items(), key=lambda x: -x[1])[:15]:
         print(f"  {cat}: {count}")

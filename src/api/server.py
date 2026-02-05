@@ -16,15 +16,25 @@ from fastapi.responses import FileResponse
 from .routes import sparql, buildings, statistics
 from .routes import reasoning, properties, ontology_editor, lean_layer
 from .utils.query_executor import init_store
-from ..parser import IFCParser
-from ..converter import RDFConverter
 from ..storage import TripleStore
+
+# Optional imports for IFC processing (requires ifcopenshell)
+try:
+    from ..parser import IFCParser
+    from ..converter import RDFConverter
+    IFC_SUPPORT = True
+except ImportError:
+    IFCParser = None
+    RDFConverter = None
+    IFC_SUPPORT = False
 
 logger = logging.getLogger(__name__)
 
-# 기본 IFC 파일 경로
-DEFAULT_IFC_PATH = "references/nwd4op-12.ifc"
-DEFAULT_RDF_PATH = "data/rdf/nwd4op-12.ttl"
+import os
+
+# 기본 파일 경로 (환경변수로 오버라이드 가능)
+DEFAULT_IFC_PATH = os.getenv("BIM_IFC_PATH", "references/nwd4op-12.ifc")
+DEFAULT_RDF_PATH = os.getenv("BIM_RDF_PATH", "data/rdf/navis-via-csv-v3.ttl")
 
 
 def load_data(ifc_path: str | None = None, rdf_path: str | None = None) -> TripleStore:
@@ -38,9 +48,9 @@ def load_data(ifc_path: str | None = None, rdf_path: str | None = None) -> Tripl
         store.load(str(rdf_file))
         return store
 
-    # IFC 파일에서 변환
+    # IFC 파일에서 변환 (ifcopenshell 필요)
     ifc_file = Path(ifc_path) if ifc_path else Path(DEFAULT_IFC_PATH)
-    if ifc_file.exists():
+    if ifc_file.exists() and IFC_SUPPORT:
         logger.info("IFC 파일 변환: %s", ifc_file)
         parser = IFCParser(str(ifc_file))
         parser.open()
@@ -55,6 +65,8 @@ def load_data(ifc_path: str | None = None, rdf_path: str | None = None) -> Tripl
         store.save(str(rdf_file))
         logger.info("RDF 캐시 저장: %s", rdf_file)
         return store
+    elif ifc_file.exists() and not IFC_SUPPORT:
+        logger.warning("IFC file found but ifcopenshell not installed. Cannot convert.")
 
     raise FileNotFoundError(
         f"IFC 파일({ifc_file}) 또는 RDF 파일({rdf_file})을 찾을 수 없습니다."
