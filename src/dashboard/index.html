@@ -42,6 +42,7 @@
         .hierarchy-node .children { margin-left: 24px; border-left: 1px solid #334155; padding-left: 12px; }
         .node-icon { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
         .badge-red { background: #450a0a; color: #f87171; }
+        .badge-gray { background: #334155; color: #94a3b8; }
         .check-card { transition: all 0.2s; }
         .check-card.hidden { display: none; }
         .check-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
@@ -175,10 +176,19 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-4 gap-4 mb-4">
                     <div class="card">
                         <div class="card-header">Data Comparison</div>
                         <div class="card-body" id="hierarchy-comparison">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header flex items-center justify-between">
+                            <span>CSV Level Distribution</span>
+                            <button class="btn btn-secondary text-xs" onclick="loadLevelDistribution()">Refresh</button>
+                        </div>
+                        <div class="card-body" id="level-distribution">
                             <div class="loading"><div class="spinner"></div>Loading...</div>
                         </div>
                     </div>
@@ -199,6 +209,27 @@
                         </div>
                     </div>
                 </div>
+                <!-- Navisworks Hierarchy Tree (ParentId 기반) -->
+                <div class="card mb-4">
+                    <div class="card-header flex items-center justify-between">
+                        <span>Navisworks Hierarchy Tree (ParentId 기반)</span>
+                        <div class="flex gap-2">
+                            <select id="navis-depth" class="text-sm">
+                                <option value="2">Depth 2</option>
+                                <option value="3" selected>Depth 3</option>
+                                <option value="4">Depth 4</option>
+                                <option value="5">Depth 5</option>
+                            </select>
+                            <button class="btn btn-primary text-sm" onclick="loadNavisHierarchyTree()">Load</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="height: 400px; overflow: auto;">
+                        <div id="navis-tree-view">
+                            <p class="text-gray-500 text-sm">Click Load to view the Navisworks hierarchy tree.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">Hierarchy Details</div>
                     <div class="card-body">

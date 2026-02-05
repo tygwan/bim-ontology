@@ -31,6 +31,8 @@ data/rdf/*.ttl
 data/rdf/*.xml
 data/rdf/*.jsonld
 data/rdf/*.bak
+data/*.ttl
+references/rdf/
 
 # Audit and test artifacts
 data/audit/*.json

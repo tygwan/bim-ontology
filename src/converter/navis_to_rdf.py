@@ -74,6 +74,8 @@ class NavisToRDFConverter:
         self._hierarchy: Dict[str, Dict] = {}
         self._path_node_cache: Dict[str, URIRef] = {}  # System Path → URI
         self._path_element_counts: Dict[str, int] = {}  # System Path → element count
+        self._child_counts: Dict[str, int] = {}  # ObjectId → direct child count
+        self._descendant_counts: Dict[str, int] = {}  # ObjectId → total descendant count
 
     def _bind_namespaces(self):
         """네임스페이스를 그래프에 바인딩한다."""
@@ -123,6 +125,10 @@ class NavisToRDFConverter:
         self.graph.add((NAVIS.hasSystemPathParent, RDFS.label, Literal("System Path Parent")))
         self.graph.add((NAVIS.hasElementCount, RDF.type, OWL.DatatypeProperty))
         self.graph.add((NAVIS.hasElementCount, RDFS.label, Literal("Element Count (pre-computed)")))
+        self.graph.add((NAVIS.hasChildCount, RDF.type, OWL.DatatypeProperty))
+        self.graph.add((NAVIS.hasChildCount, RDFS.label, Literal("Direct Child Count")))
+        self.graph.add((NAVIS.hasDescendantCount, RDF.type, OWL.DatatypeProperty))
+        self.graph.add((NAVIS.hasDescendantCount, RDFS.label, Literal("Total Descendant Count")))
 
         # Navis 프로퍼티
         props = [
@@ -368,18 +374,69 @@ class NavisToRDFConverter:
                             self._path_element_counts.get(ancestor_path, 0) + 1
                         )
 
-        # 계층 노드에 미리 계산된 요소 수 추가
+        # 계층 노드에 미리 계산된 요소 수 추가 (System Path 기반)
         for path, count in self._path_element_counts.items():
             if path in self._path_node_cache:
                 node_uri = self._path_node_cache[path]
                 self.graph.add((node_uri, NAVIS.hasElementCount, Literal(count, datatype=XSD.integer)))
 
+        # 3단계: ParentId 기반 자식/자손 수 계산
+        logger.info("Computing child and descendant counts...")
+        self._compute_hierarchy_counts(objects)
+
+        # 각 노드에 자식 수와 자손 수 추가
+        for obj_id, child_count in self._child_counts.items():
+            if obj_id in self._object_cache:
+                uri = self._object_cache[obj_id]
+                self.graph.add((uri, NAVIS.hasChildCount, Literal(child_count, datatype=XSD.integer)))
+
+        for obj_id, desc_count in self._descendant_counts.items():
+            if obj_id in self._object_cache:
+                uri = self._object_cache[obj_id]
+                self.graph.add((uri, NAVIS.hasDescendantCount, Literal(desc_count, datatype=XSD.integer)))
+
         # 계층 노드 통계
         stats["path_nodes"] = len(self._path_node_cache)
+        stats["hierarchy_nodes"] = sum(1 for c in self._child_counts.values() if c > 0)
         stats["triples_added"] = len(self.graph) - initial_triples
-        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes")
+        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes, {stats['hierarchy_nodes']} hierarchy nodes")
 
         return stats
+
+    def _compute_hierarchy_counts(self, objects: Dict[str, Dict]):
+        """ParentId 기반으로 자식 수와 자손 수를 계산한다."""
+        from collections import defaultdict
+
+        # 부모별 자식 목록 생성
+        children_map: Dict[str, List[str]] = defaultdict(list)
+        null_parent = "00000000-0000-0000-0000-000000000000"
+
+        for obj_id, obj_data in objects.items():
+            parent_id = obj_data["parent_id"]
+            if parent_id and parent_id != null_parent:
+                children_map[parent_id].append(obj_id)
+
+        # 직접 자식 수 계산
+        for parent_id, children in children_map.items():
+            self._child_counts[parent_id] = len(children)
+
+        # 자손 수 계산 (재귀적으로 모든 하위 노드 카운트)
+        def count_descendants(obj_id: str) -> int:
+            if obj_id in self._descendant_counts:
+                return self._descendant_counts[obj_id]
+
+            children = children_map.get(obj_id, [])
+            total = len(children)
+            for child_id in children:
+                total += count_descendants(child_id)
+
+            self._descendant_counts[obj_id] = total
+            return total
+
+        # 모든 부모 노드에 대해 자손 수 계산
+        for parent_id in children_map.keys():
+            if parent_id not in self._descendant_counts:
+                count_descendants(parent_id)
 
     def convert_schedule_csv(self, csv_path: str) -> Dict[str, Any]:
         """Schedule CSV를 RDF로 변환한다.

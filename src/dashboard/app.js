@@ -1596,6 +1596,64 @@ GROUP BY ?type`;
     `;
 }
 
+async function loadLevelDistribution() {
+    const container = document.getElementById('level-distribution');
+
+    // Query level distribution from original CSV Level (navis:hasLevel)
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+
+SELECT ?level (COUNT(?elem) AS ?count)
+WHERE {
+    ?elem a navis:SP3DEntity ;
+          navis:hasLevel ?level .
+}
+GROUP BY ?level
+ORDER BY ?level`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    if (!data || !data.results || data.results.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">No level data available</p>';
+        return;
+    }
+
+    // Calculate total for percentages
+    const total = data.results.reduce((sum, row) => sum + parseInt(row.count), 0);
+
+    // Render level distribution
+    let html = `<div class="text-xs text-gray-400 mb-3">Original Navisworks hierarchy depth</div>`;
+    html += '<div class="space-y-2">';
+
+    // Color gradient from purple to blue
+    const colors = ['#c084fc', '#a78bfa', '#818cf8', '#6366f1', '#4f46e5', '#4338ca', '#3730a3', '#312e81'];
+
+    data.results.forEach((row, i) => {
+        const level = row.level;
+        const count = parseInt(row.count);
+        const pct = ((count / total) * 100).toFixed(1);
+        const color = colors[Math.min(i, colors.length - 1)];
+
+        html += `
+            <div class="flex items-center gap-2">
+                <span class="text-xs w-6" style="color:${color}">L${level}</span>
+                <div class="flex-1 h-4 rounded" style="background:#0f172a">
+                    <div class="h-full rounded" style="width:${pct}%; background:${color}"></div>
+                </div>
+                <span class="text-xs text-gray-400 w-16 text-right">${count.toLocaleString()}</span>
+                <span class="text-xs text-gray-500 w-10 text-right">${pct}%</span>
+            </div>`;
+    });
+
+    html += '</div>';
+    html += `<div class="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-400">
+        <strong>Total:</strong> ${total.toLocaleString()} elements<br>
+        <span class="text-yellow-400">Note:</span> CSV ParentId is flattened (all → root)
+    </div>`;
+
+    container.innerHTML = html;
+}
+
 async function loadHierarchyTree() {
     const container = document.getElementById('hierarchy-tree-view');
     const maxDepth = parseInt(document.getElementById('hierarchy-depth').value);
@@ -1720,14 +1778,14 @@ async function loadHierarchyNodeDetail(path, name) {
     const container = document.getElementById('hierarchy-details');
     container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading elements...</div>';
 
-    // Query elements in this path
+    // Query elements in this path (including original CSV Level)
     const query = `
 PREFIX navis: <http://example.org/bim-ontology/navis#>
 PREFIX sp3d: <http://example.org/bim-ontology/sp3d#>
 PREFIX bim: <http://example.org/bim-ontology/schema#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?name ?category ?status
+SELECT ?name ?category ?status ?level
 WHERE {
     ?elem a navis:SP3DEntity ;
           rdfs:label ?name ;
@@ -1735,7 +1793,9 @@ WHERE {
     FILTER(STRSTARTS(?path, "${path}"))
     OPTIONAL { ?elem bim:hasCategory ?category }
     OPTIONAL { ?elem sp3d:hasStatus ?status }
+    OPTIONAL { ?elem navis:hasLevel ?level }
 }
+ORDER BY ?level ?name
 LIMIT 50`;
 
     const data = await apiPost('/api/sparql', { query });
@@ -1745,11 +1805,27 @@ LIMIT 50`;
     if (!data || !data.results || data.results.length === 0) {
         html += '<p class="text-gray-500 text-sm">No elements found in this path.</p>';
     } else {
-        html += '<table><thead><tr><th>Name</th><th>Category</th><th>Status</th></tr></thead><tbody>';
+        // Level distribution summary
+        const levelCounts = {};
         data.results.forEach(row => {
+            const lvl = row.level ?? 'N/A';
+            levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
+        });
+        html += '<div class="mb-3"><span class="text-xs text-gray-400">CSV Levels: </span>';
+        Object.entries(levelCounts).sort((a, b) => a[0] - b[0]).forEach(([lvl, cnt]) => {
+            html += `<span class="badge badge-gray text-xs ml-1">L${lvl}: ${cnt}</span>`;
+        });
+        html += '</div>';
+
+        html += '<table><thead><tr><th>Name</th><th>Category</th><th>CSV Level</th><th>Status</th></tr></thead><tbody>';
+        data.results.forEach(row => {
+            const levelBadge = row.level != null
+                ? `<span class="badge" style="background:#4f46e522;color:#818cf8">L${row.level}</span>`
+                : '<span class="text-gray-600">-</span>';
             html += `<tr>
                 <td class="text-sm">${row.name || '-'}</td>
                 <td><span class="badge badge-blue">${row.category || '-'}</span></td>
+                <td>${levelBadge}</td>
                 <td class="text-xs text-gray-400">${row.status || '-'}</td>
             </tr>`;
         });
@@ -1762,9 +1838,189 @@ LIMIT 50`;
     container.innerHTML = html;
 }
 
+async function loadNavisHierarchyTree() {
+    const container = document.getElementById('navis-tree-view');
+    const maxDepth = parseInt(document.getElementById('navis-depth').value);
+
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Building tree...</div>';
+
+    // Query nodes with parent-child relationships (using hasChildCount/hasDescendantCount)
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?node ?name ?level ?parent ?children ?descendants
+WHERE {
+    ?node navis:hasLevel ?level ;
+          rdfs:label ?name .
+    FILTER(?level <= ${maxDepth})
+    OPTIONAL { ?node navis:hasParent ?parent }
+    OPTIONAL { ?node navis:hasChildCount ?children }
+    OPTIONAL { ?node navis:hasDescendantCount ?descendants }
+}
+ORDER BY ?level ?name
+LIMIT 500`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    if (!data || !data.results || data.results.length === 0) {
+        container.innerHTML = '<p class="text-red-400">Failed to load hierarchy</p>';
+        return;
+    }
+
+    // Build tree structure from parent-child relationships
+    const nodes = {};
+    const roots = [];
+
+    // First pass: create all nodes
+    data.results.forEach(row => {
+        const nodeUri = row.node;
+        const nodeId = nodeUri.split('/').pop();
+        nodes[nodeUri] = {
+            id: nodeId,
+            uri: nodeUri,
+            name: row.name,
+            level: parseInt(row.level) || 0,
+            parentUri: row.parent || null,
+            children: parseInt(row.children) || 0,
+            descendants: parseInt(row.descendants) || 0,
+            childNodes: []
+        };
+    });
+
+    // Second pass: build tree structure
+    Object.values(nodes).forEach(node => {
+        if (node.parentUri && nodes[node.parentUri]) {
+            nodes[node.parentUri].childNodes.push(node);
+        } else if (node.level === 0) {
+            roots.push(node);
+        }
+    });
+
+    // Sort children by descendant count (descending)
+    const sortChildren = (node) => {
+        node.childNodes.sort((a, b) => b.descendants - a.descendants);
+        node.childNodes.forEach(sortChildren);
+    };
+    roots.forEach(sortChildren);
+
+    // Render tree
+    const levelColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+
+    function renderNode(node, depth = 0) {
+        const color = levelColors[Math.min(node.level, levelColors.length - 1)];
+        const margin = depth * 20;
+        const hasChildren = node.childNodes.length > 0 || node.children > 0;
+        const displayName = node.name.length > 40 ? node.name.substring(0, 40) + '...' : node.name;
+
+        let html = `
+            <div class="hierarchy-tree-node" style="margin-left: ${margin}px; padding: 4px 8px; cursor: pointer; border-radius: 4px;"
+                 onclick="loadNavisNodeDetail('${node.uri.replace(/'/g, "\\'")}')"
+                 onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <span class="node-icon" style="background: ${color}"></span>
+                <span class="text-sm">${displayName}</span>
+                <span class="badge" style="background: ${color}22; color: ${color}; margin-left: 8px;">L${node.level}</span>
+                ${node.children > 0 ? `<span class="text-xs text-gray-400 ml-2">(${node.children} direct)</span>` : ''}
+                ${node.descendants > 0 ? `<span class="text-xs text-green-400 ml-1">[${node.descendants.toLocaleString()} total]</span>` : ''}
+            </div>`;
+
+        // Render children
+        node.childNodes.forEach(child => {
+            html += renderNode(child, depth + 1);
+        });
+
+        return html;
+    }
+
+    let html = '';
+    roots.forEach(root => {
+        html += renderNode(root, 0);
+    });
+
+    container.innerHTML = html || '<p class="text-gray-500">No hierarchy data found</p>';
+}
+
+async function loadNavisNodeDetail(nodeUri) {
+    const container = document.getElementById('hierarchy-details');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading children...</div>';
+
+    // Query direct children of this node
+    const query = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bim: <http://example.org/bim-ontology/schema#>
+
+SELECT ?name ?level ?category ?children ?descendants
+WHERE {
+    ?child navis:hasParent <${nodeUri}> ;
+           rdfs:label ?name ;
+           navis:hasLevel ?level .
+    OPTIONAL { ?child bim:hasCategory ?category }
+    OPTIONAL { ?child navis:hasChildCount ?children }
+    OPTIONAL { ?child navis:hasDescendantCount ?descendants }
+}
+ORDER BY DESC(?descendants) ?name
+LIMIT 100`;
+
+    const data = await apiPost('/api/sparql', { query });
+
+    // Get parent node info
+    const parentQuery = `
+PREFIX navis: <http://example.org/bim-ontology/navis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?name ?level ?children ?descendants
+WHERE {
+    <${nodeUri}> rdfs:label ?name ;
+                 navis:hasLevel ?level .
+    OPTIONAL { <${nodeUri}> navis:hasChildCount ?children }
+    OPTIONAL { <${nodeUri}> navis:hasDescendantCount ?descendants }
+}`;
+    const parentData = await apiPost('/api/sparql', { query: parentQuery });
+
+    let parentName = nodeUri.split('/').pop();
+    let parentLevel = '?';
+    let parentChildren = 0;
+    let parentDescendants = 0;
+
+    if (parentData && parentData.results && parentData.results.length > 0) {
+        parentName = parentData.results[0].name;
+        parentLevel = parentData.results[0].level;
+        parentChildren = parseInt(parentData.results[0].children) || 0;
+        parentDescendants = parseInt(parentData.results[0].descendants) || 0;
+    }
+
+    let html = `
+        <h4 class="text-sm font-semibold text-blue-400 mb-2">
+            ${parentName}
+            <span class="badge badge-purple ml-2">L${parentLevel}</span>
+            <span class="text-xs text-gray-400 ml-2">(${parentChildren} direct, ${parentDescendants.toLocaleString()} total descendants)</span>
+        </h4>`;
+
+    if (!data || !data.results || data.results.length === 0) {
+        html += '<p class="text-gray-500 text-sm">No children found (leaf node).</p>';
+    } else {
+        html += '<table><thead><tr><th>Name</th><th>Level</th><th>Category</th><th>Direct</th><th>Total</th></tr></thead><tbody>';
+        data.results.forEach(row => {
+            const children = parseInt(row.children) || 0;
+            const descendants = parseInt(row.descendants) || 0;
+            html += `<tr>
+                <td class="text-sm">${row.name || '-'}</td>
+                <td><span class="badge badge-purple">L${row.level}</span></td>
+                <td><span class="badge badge-blue">${row.category || '-'}</span></td>
+                <td class="text-right">${children}</td>
+                <td class="text-right text-green-400">${descendants.toLocaleString()}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    container.innerHTML = html;
+}
+
 function initHierarchyTab() {
     loadHierarchyFiles();
     loadHierarchyComparison();
+    loadLevelDistribution();
     loadHierarchyTree();
 }
 
