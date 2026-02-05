@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bso.construction/schemas/hierarchy-csv-schema.json",
+  "title": "DXTnavis Hierarchy CSV Schema",
+  "description": "Schema for CSV files exported by DXTnavis HierarchyFileWriter (v1.3.0+)",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["ObjectId", "ParentId", "Level", "DisplayName", "Category", "PropertyName", "PropertyValue"],
+  "properties": {
+    "ObjectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable unique identifier (Synthetic ID from v1.3.0). Never Guid.Empty."
+    },
+    "ParentId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent object's ObjectId. Guid.Empty for root objects."
+    },
+    "Level": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Hierarchy depth (0 = root level)"
+    },
+    "DisplayName": {
+      "type": "string",
+      "description": "Human-readable object name"
+    },
+    "Category": {
+      "type": "string",
+      "description": "Property category (e.g., 'Item', 'Element', 'LcRevitData')"
+    },
+    "PropertyName": {
+      "type": "string",
+      "description": "Property name within category"
+    },
+    "PropertyValue": {
+      "type": "string",
+      "description": "Original property value as DisplayString"
+    },
+    "RawValue": {
+      "type": "string",
+      "description": "Parsed value without type prefix (v0.6.2+)"
+    },
+    "DataType": {
+      "type": "string",
+      "description": "Detected data type (e.g., 'Double', 'Int32', 'DisplayLength')"
+    },
+    "Unit": {
+      "type": "string",
+      "description": "Unit of measurement (e.g., 'm', 'mm', 'sq m')"
+    }
+  },
+  "examples": [
+    {
+      "ObjectId": "a1b2c3d4-5678-9abc-def0-123456789012",
+      "ParentId": "00000000-0000-0000-0000-000000000000",
+      "Level": 0,
+      "DisplayName": "Project Root",
+      "Category": "Item",
+      "PropertyName": "Name",
+      "PropertyValue": "My Building",
+      "RawValue": "My Building",
+      "DataType": "String",
+      "Unit": ""
+    },
+    {
+      "ObjectId": "b2c3d4e5-6789-abcd-ef01-234567890123",
+      "ParentId": "a1b2c3d4-5678-9abc-def0-123456789012",
+      "Level": 1,
+      "DisplayName": "Column-001",
+      "Category": "LcRevitData",
+      "PropertyName": "Element ID",
+      "PropertyValue": "1234567",
+      "RawValue": "1234567",
+      "DataType": "Int32",
+      "Unit": ""
+    }
+  ],
+  "csv_header_order": [
+    "ObjectId",
+    "ParentId",
+    "Level",
+    "DisplayName",
+    "Category",
+    "PropertyName",
+    "PropertyValue",
+    "RawValue",
+    "DataType",
+    "Unit"
+  ],
+  "notes": {
+    "encoding": "UTF-8 with BOM recommended for Korean text",
+    "date_format": "ISO 8601 (YYYY-MM-DD)",
+    "null_representation": "Empty string",
+    "escaping": "Standard CSV (RFC 4180) - double quotes for fields containing comma, newline, or quote"
+  }
+}

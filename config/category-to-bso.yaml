@@ -1,0 +1,358 @@
+# BIM Category to BSO Class Mapping
+# =================================
+# Unified mapping configuration for both Python and C# components
+#
+# Usage:
+#   - Python: dxtnavis_loader.py, bim_extractor.py
+#   - C#: OntologyService.cs, HierarchyToRdfConverter.cs
+#
+# Version: 1.0.0
+# Last Updated: 2026-02-05
+
+version: "1.0.0"
+
+# Namespace definitions
+namespaces:
+  bso: "http://bso.construction/ontology#"
+  bot: "https://w3id.org/bot#"
+  ifc: "https://standards.buildingsmart.org/IFC/DEV/IFC4/ADD2_TC1/OWL#"
+
+# =============================================================================
+# Structural Elements (bso:StructuralElement)
+# =============================================================================
+structural:
+  - patterns:
+      - "Column"
+      - "기둥"
+      - "IfcColumn"
+      - "Columns"
+      - "Structural Columns"
+    bso_class: "bso:Column"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcColumn"
+    priority: 1
+
+  - patterns:
+      - "Beam"
+      - "보"
+      - "IfcBeam"
+      - "Beams"
+      - "Structural Framing"
+    bso_class: "bso:Beam"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcBeam"
+    priority: 1
+
+  - patterns:
+      - "Slab"
+      - "슬래브"
+      - "IfcSlab"
+      - "Slabs"
+      - "Floor"
+      - "바닥"
+      - "Floors"
+      - "Structural Floor"
+    bso_class: "bso:Slab"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcSlab"
+    priority: 1
+
+  - patterns:
+      - "Foundation"
+      - "기초"
+      - "IfcFooting"
+      - "IfcPile"
+      - "Footing"
+      - "Pile"
+      - "Foundations"
+    bso_class: "bso:Foundation"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcFooting"
+    priority: 1
+
+  - patterns:
+      - "Wall"
+      - "벽"
+      - "IfcWall"
+      - "IfcWallStandardCase"
+      - "Walls"
+      - "Structural Wall"
+      - "Basic Wall"
+    bso_class: "bso:Wall"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcWall"
+    priority: 1
+
+  - patterns:
+      - "Brace"
+      - "가새"
+      - "IfcMember"
+      - "Bracing"
+    bso_class: "bso:Brace"
+    parent_class: "bso:StructuralElement"
+    ifc_class: "ifc:IfcMember"
+    priority: 2
+
+# =============================================================================
+# Architectural Elements (bso:ArchitecturalElement)
+# =============================================================================
+architectural:
+  - patterns:
+      - "Door"
+      - "문"
+      - "IfcDoor"
+      - "Doors"
+    bso_class: "bso:Door"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcDoor"
+    priority: 1
+
+  - patterns:
+      - "Window"
+      - "창문"
+      - "창"
+      - "IfcWindow"
+      - "Windows"
+    bso_class: "bso:Window"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcWindow"
+    priority: 1
+
+  - patterns:
+      - "Stair"
+      - "계단"
+      - "IfcStair"
+      - "IfcStairFlight"
+      - "Stairs"
+    bso_class: "bso:Stair"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcStair"
+    priority: 1
+
+  - patterns:
+      - "Railing"
+      - "난간"
+      - "IfcRailing"
+      - "Railings"
+      - "Handrail"
+    bso_class: "bso:Railing"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcRailing"
+    priority: 2
+
+  - patterns:
+      - "Ceiling"
+      - "천장"
+      - "IfcCovering"
+      - "Ceilings"
+    bso_class: "bso:Ceiling"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcCovering"
+    priority: 2
+
+  - patterns:
+      - "Curtain Wall"
+      - "커튼월"
+      - "IfcCurtainWall"
+      - "Curtain Walls"
+    bso_class: "bso:CurtainWall"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcCurtainWall"
+    priority: 1
+
+  - patterns:
+      - "Roof"
+      - "지붕"
+      - "IfcRoof"
+      - "Roofs"
+    bso_class: "bso:Roof"
+    parent_class: "bso:ArchitecturalElement"
+    ifc_class: "ifc:IfcRoof"
+    priority: 1
+
+# =============================================================================
+# MEP Elements (bso:MEPElement)
+# =============================================================================
+mep:
+  - patterns:
+      - "Pipe"
+      - "배관"
+      - "IfcPipeSegment"
+      - "IfcFlowSegment"
+      - "Pipes"
+      - "Piping"
+    bso_class: "bso:Pipe"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcPipeSegment"
+    priority: 1
+
+  - patterns:
+      - "Duct"
+      - "덕트"
+      - "IfcDuctSegment"
+      - "Ducts"
+      - "Air Duct"
+    bso_class: "bso:Duct"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcDuctSegment"
+    priority: 1
+
+  - patterns:
+      - "Cable"
+      - "케이블"
+      - "IfcCableSegment"
+      - "Cable Tray"
+      - "케이블트레이"
+      - "Cables"
+    bso_class: "bso:CableTray"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcCableCarrierSegment"
+    priority: 1
+
+  - patterns:
+      - "Fitting"
+      - "피팅"
+      - "IfcPipeFitting"
+      - "Pipe Fitting"
+      - "Fittings"
+    bso_class: "bso:PipeFitting"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcPipeFitting"
+    priority: 2
+
+  - patterns:
+      - "Equipment"
+      - "장비"
+      - "IfcDistributionElement"
+      - "Mechanical Equipment"
+      - "HVAC"
+    bso_class: "bso:MechanicalEquipment"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcDistributionElement"
+    priority: 2
+
+  - patterns:
+      - "Electrical"
+      - "전기"
+      - "IfcElectricDistributionBoard"
+      - "Electrical Equipment"
+    bso_class: "bso:ElectricalEquipment"
+    parent_class: "bso:MEPElement"
+    ifc_class: "ifc:IfcElectricDistributionBoard"
+    priority: 2
+
+# =============================================================================
+# Spatial Elements (bso:SpatialElement / bot:Zone)
+# =============================================================================
+spatial:
+  - patterns:
+      - "Level"
+      - "층"
+      - "IfcBuildingStorey"
+      - "Levels"
+      - "Floor Level"
+    bso_class: "bso:Level"
+    parent_class: "bot:Storey"
+    ifc_class: "ifc:IfcBuildingStorey"
+    priority: 1
+
+  - patterns:
+      - "Room"
+      - "실"
+      - "IfcSpace"
+      - "Rooms"
+      - "Space"
+    bso_class: "bso:Room"
+    parent_class: "bot:Space"
+    ifc_class: "ifc:IfcSpace"
+    priority: 1
+
+  - patterns:
+      - "Zone"
+      - "구역"
+      - "IfcZone"
+      - "Zones"
+      - "Area"
+    bso_class: "bso:Zone"
+    parent_class: "bot:Zone"
+    ifc_class: "ifc:IfcZone"
+    priority: 1
+
+  - patterns:
+      - "Building"
+      - "건물"
+      - "IfcBuilding"
+      - "Buildings"
+    bso_class: "bso:Building"
+    parent_class: "bot:Building"
+    ifc_class: "ifc:IfcBuilding"
+    priority: 1
+
+  - patterns:
+      - "Site"
+      - "대지"
+      - "IfcSite"
+    bso_class: "bso:Site"
+    parent_class: "bot:Site"
+    ifc_class: "ifc:IfcSite"
+    priority: 1
+
+# =============================================================================
+# Default Fallback
+# =============================================================================
+default:
+  bso_class: "bso:BimElement"
+  parent_class: "bso:BimElement"
+  ifc_class: null
+  priority: 99
+
+# =============================================================================
+# Matching Configuration
+# =============================================================================
+matching:
+  # Case-insensitive matching
+  case_insensitive: true
+
+  # Match partial strings (contains)
+  partial_match: true
+
+  # Priority resolution (lower = higher priority)
+  # When multiple patterns match, use lowest priority number
+  priority_resolution: "lowest"
+
+  # Korean preprocessing
+  korean:
+    enable_normalization: true
+    strip_particles: true  # 은/는/이/가/을/를 etc.
+
+# =============================================================================
+# Property Extraction Rules
+# =============================================================================
+property_extraction:
+  # Properties to extract for BSO individuals
+  required_properties:
+    - category: "Item"
+      property: "GUID"
+      bso_property: "bso:ifcGuid"
+
+    - category: "Element"
+      property: "Element ID"
+      bso_property: "bso:revitElementId"
+
+    - category: "LcRevitData"
+      property: "Level"
+      bso_property: "bso:onLevel"
+
+  # Geometry properties
+  geometry_properties:
+    - property: "Volume"
+      bso_property: "bso:hasVolume"
+      unit_conversion: "cubic_meter"
+
+    - property: "Area"
+      bso_property: "bso:hasArea"
+      unit_conversion: "square_meter"
+
+    - property: "Length"
+      bso_property: "bso:hasLength"
+      unit_conversion: "meter"
