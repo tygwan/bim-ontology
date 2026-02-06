@@ -4,9 +4,192 @@
   "howToAdd": "Submit a PR adding your project to the 'projects' array",
   "projects": [
     {
+      "name": "tygwan/bim-ontology",
+      "url": "https://github.com/tygwan/bim-ontology",
+      "description": "BIM Ontology - Semantic BIM Pipeline",
+      "detail": {
+        "asOfDate": "2026-02-06",
+        "purpose": "IFC/CSV 기반 BIM 데이터를 RDF/OWL로 변환하고 SPARQL, SHACL, OWL/RDFS 추론을 통해 시맨틱 질의/검증이 가능한 파이프라인 제공",
+        "painPoints": [
+          "IFC exporter 경로에서 계층/속성 손실이 발생하여 원본 맥락 보존이 어려움",
+          "Navisworks 내보내기 시 타입/식별자 불일치로 매핑 안정성이 낮아짐",
+          "대용량 RDF에서 반복 질의 시 응답 시간 편차가 큼"
+        ],
+        "outcomes": [
+          "IFC -> RDF/OWL 변환 파이프라인 구축",
+          "이름 기반 29개 카테고리 자동 분류 체계 정립",
+          "SPARQL + SHACL + OWL/RDFS 추론 통합",
+          "LRU 캐시 벤치마크 기준 최대 14,869x 질의 가속"
+        ],
+        "moreDetails": [
+          {
+            "topic": "IFC -> RDF/OWL End-to-End 파이프라인",
+            "whatWasDone": "IFCParser, RDFConverter, TripleStore, Reasoner, Validator, API/Dashboard까지 단일 흐름으로 연결",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/tracking/PROJECT-STATUS-REPORT.md",
+                "lines": "64-83",
+                "note": "파이프라인 및 구현 모듈 목록"
+              },
+              {
+                "type": "code",
+                "path": "src/api/server.py",
+                "lines": "40-67",
+                "note": "RDF 우선 로딩 + IFC 변환 fallback 동작"
+              }
+            ]
+          },
+          {
+            "topic": "29개 카테고리 자동 분류",
+            "whatWasDone": "Navisworks 내보내기로 손실된 타입을 이름 패턴 분류로 복원",
+            "evidence": [
+              {
+                "type": "code",
+                "path": "src/parser/ifc_parser.py",
+                "lines": "18-52",
+                "note": "CATEGORY_PATTERNS 정의 (29 keys)"
+              },
+              {
+                "type": "doc",
+                "path": "docs/tracking/PROJECT-STATUS-REPORT.md",
+                "lines": "267-270",
+                "note": "분류 규칙(29개 카테고리) 완료 상태"
+              }
+            ]
+          },
+          {
+            "topic": "쿼리 속도 14,869x 향상의 기술적 근거",
+            "whatWasDone": "Cold 경로(rdflib SPARQL 실행 + 결과 물질화)와 Hot 경로(정규화+해시 키로 OrderedDict 조회)를 분리해 반복 쿼리 비용을 제거",
+            "evidence": [
+              {
+                "type": "code",
+                "path": "scripts/benchmark_phase4.py",
+                "lines": "86-112",
+                "note": "Cold/Hot 시간 측정 및 speedup 계산 로직"
+              },
+              {
+                "type": "code",
+                "path": "src/storage/triple_store.py",
+                "lines": "90-110",
+                "note": "Cold 경로: graph.query + row 변환 비용"
+              },
+              {
+                "type": "code",
+                "path": "src/cache/query_cache.py",
+                "lines": "30-52",
+                "note": "Hot 경로: LRU 조회/TTL/eviction"
+              },
+              {
+                "type": "doc",
+                "path": "docs/phases/phase-4/CHECKLIST.md",
+                "lines": "38-39",
+                "note": "Cold 65.6ms -> Hot 0.004ms (14,869x) 기록"
+              }
+            ],
+            "limitations": "해당 수치는 캐시 hit 기준 벤치마크이며, 기본 API 경로는 현재 store.query 직호출로 캐시 미연동 상태"
+          },
+          {
+            "topic": "SPARQL + SHACL + OWL/RDFS 통합 운용",
+            "whatWasDone": "추론 규칙과 검증 규칙을 API/대시보드 경로에서 함께 운영",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/tracking/PROJECT-STATUS-REPORT.md",
+                "lines": "30-35",
+                "note": "프로젝트 목표에 SPARQL/OWL/SHACL 명시"
+              },
+              {
+                "type": "doc",
+                "path": "docs/phases/phase-4/CHECKLIST.md",
+                "lines": "41-52",
+                "note": "OWL/RDFS 추론 및 결과 트리플 증가 기록"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "tygwan/dxtnavis",
       "url": "https://github.com/tygwan/dxtnavis",
-      "description": "DXT Navigator - Real-world example project"
+      "description": "DXT Navigator - Real-world example project",
+      "detail": {
+        "asOfDate": "2026-02-06",
+        "purpose": "Navisworks 내부 계층/속성을 손실 없이 추출해 BIM 온톨로지 파이프라인 입력 품질을 높이는 추출기",
+        "painPoints": [
+          "Navisworks IFC Export 경로는 SP3D 속성, 깊은 계층, 식별자 맥락을 충분히 보존하지 못함",
+          "ObjectId/ParentId 불안정 시 하위 시스템(스케줄/추론) 연동 정확도가 떨어짐",
+          "dxt:와 bso: 네임스페이스 이원화로 통합 파이프라인 일관성이 낮음"
+        ],
+        "outcomes": [
+          "ObjectId/ParentId/Level 기반 계층 CSV 추출 경로 확보",
+          "Synthetic ID 전략(v1.3.0)으로 식별자 안정성 개선",
+          "CSV -> RDF 변환 시 IFC 경로 대비 트리플/객체/속성 보존량 개선"
+        ],
+        "moreDetails": [
+          {
+            "topic": "Synthetic ID 안정화 전략",
+            "whatWasDone": "InstanceGuid, Item GUID, Authoring ID, Path Hash 순의 fallback 체계로 결정론적 식별자 확보",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/technical/INTEGRATION-STRATEGY.md",
+                "lines": "82-90",
+                "note": "GetStableObjectId fallback 순서"
+              }
+            ]
+          },
+          {
+            "topic": "계층/속성 손실 최소화 CSV 계약",
+            "whatWasDone": "ObjectId, ParentId, Level, DisplayName, Category, PropertyName, RawValue, DataType, Unit 중심 스키마 운영",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/tracking/PROJECT-STATUS-REPORT.md",
+                "lines": "209-219",
+                "note": "CSV 필드 정의"
+              },
+              {
+                "type": "doc",
+                "path": "docs/technical/INTEGRATION-STRATEGY.md",
+                "lines": "125-145",
+                "note": "CSV JSON Schema 제안"
+              }
+            ]
+          },
+          {
+            "topic": "IFC 경로 대비 정보 보존 개선",
+            "whatWasDone": "dxtnavis CSV 기반 RDF에서 객체 수/계층 깊이/SP3D 속성 보존이 향상",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/tracking/PROJECT-STATUS-REPORT.md",
+                "lines": "221-246",
+                "note": "IFC vs CSV 비교 수치 (트리플/객체/깊이/속성)"
+              }
+            ]
+          },
+          {
+            "topic": "bso 통합을 위한 다음 단계",
+            "whatWasDone": "dxt 네임스페이스 내부 RDF를 bso 표준으로 통일하기 위한 단계적 마이그레이션 계획 수립",
+            "evidence": [
+              {
+                "type": "doc",
+                "path": "docs/technical/INTEGRATION-STRATEGY.md",
+                "lines": "199-249",
+                "note": "네임스페이스 통일 및 추론 규칙 전환 계획"
+              },
+              {
+                "type": "doc",
+                "path": "docs/technical/INTEGRATION-STRATEGY.md",
+                "lines": "302-325",
+                "note": "단기/중기/장기 구현 우선순위"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
