@@ -1,16 +1,16 @@
 """Navisworks CSV (dxtnavis export) → RDF 변환기.
 
-dxtnavis에서 추출한 AllHierarchy CSV와 Schedule CSV를 RDF로 변환합니다.
+dxtnavis에서 추출한 CSV를 RDF로 변환합니다.
 IFC 중간 단계 없이 원본 데이터의 풍부한 속성을 보존합니다.
 
-MVP v3 구현:
-- AllHierarchy.csv → 계층 구조 + 속성 + SmartPlant 3D 정보
-- System Path 기반 실제 계층 구조 생성 (Area → Unit → Equipment)
-- schedule.csv → ConstructionTask + 요소 연결
-- 모든 CSV 속성을 Property-Value 패턴으로 저장 (Category, PropertyName, RawValue, DataType, Unit)
+지원 포맷:
+- UnifiedExport CSV (v2): 오브젝트당 1행, PropertiesJson + BBox/Centroid/Volume
+- AllHierarchy CSV (v1): 속성당 1행, 플랫 컬럼 (하위 호환)
+- schedule.csv: ConstructionTask + 요소 연결
 """
 
 import csv
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +27,7 @@ NAVIS = Namespace("http://example.org/bim-ontology/navis#")
 SP3D = Namespace("http://example.org/bim-ontology/sp3d#")
 SCHED = Namespace("http://example.org/bim-ontology/schedule#")
 PROP = Namespace("http://example.org/bim-ontology/property#")  # Property-Value 패턴용
+BSO = Namespace("http://example.org/bim-ontology/spatial#")  # BoundingBox/Spatial 정보
 
 
 class NavisToRDFConverter:
@@ -111,6 +112,7 @@ class NavisToRDFConverter:
         self.graph.bind("sp3d", SP3D)
         self.graph.bind("sched", SCHED)
         self.graph.bind("prop", PROP)
+        self.graph.bind("bso", BSO)
         self.graph.bind("rdf", RDF)
         self.graph.bind("rdfs", RDFS)
         self.graph.bind("owl", OWL)
@@ -201,8 +203,32 @@ class NavisToRDFConverter:
             (PROP.rawValue, "Raw Value", OWL.DatatypeProperty),
             (PROP.dataType, "Data Type", OWL.DatatypeProperty),
             (PROP.unit, "Unit", OWL.DatatypeProperty),
+            (PROP.numericValue, "Numeric Value (pre-parsed)", OWL.DatatypeProperty),
         ]
         for prop, label, prop_type in prop_schema:
+            self.graph.add((prop, RDF.type, prop_type))
+            self.graph.add((prop, RDFS.label, Literal(label)))
+
+        # Spatial/BoundingBox 스키마 (BSO namespace)
+        self.graph.add((BSO.BoundingBox, RDF.type, OWL.Class))
+        self.graph.add((BSO.BoundingBox, RDFS.label, Literal("Bounding Box")))
+
+        bso_props = [
+            (BSO.hasBoundingBox, "Has Bounding Box", OWL.ObjectProperty),
+            (BSO.minX, "Min X", OWL.DatatypeProperty),
+            (BSO.minY, "Min Y", OWL.DatatypeProperty),
+            (BSO.minZ, "Min Z", OWL.DatatypeProperty),
+            (BSO.maxX, "Max X", OWL.DatatypeProperty),
+            (BSO.maxY, "Max Y", OWL.DatatypeProperty),
+            (BSO.maxZ, "Max Z", OWL.DatatypeProperty),
+            (BSO.centroidX, "Centroid X", OWL.DatatypeProperty),
+            (BSO.centroidY, "Centroid Y", OWL.DatatypeProperty),
+            (BSO.centroidZ, "Centroid Z", OWL.DatatypeProperty),
+            (BSO.volume, "BBox Volume", OWL.DatatypeProperty),
+            (BSO.hasMesh, "Has Mesh", OWL.DatatypeProperty),
+            (BSO.meshUri, "Mesh URI", OWL.DatatypeProperty),
+        ]
+        for prop, label, prop_type in bso_props:
             self.graph.add((prop, RDF.type, prop_type))
             self.graph.add((prop, RDFS.label, Literal(label)))
 
@@ -543,6 +569,264 @@ class NavisToRDFConverter:
             if parent_id not in self._descendant_counts:
                 count_descendants(parent_id)
 
+    def convert_unified_csv(self, csv_path: str) -> Dict[str, Any]:
+        """UnifiedExport CSV (v2 포맷)를 RDF로 변환한다.
+
+        오브젝트당 1행, PropertiesJson에 모든 속성이 JSON 배열로 포함되어 있고,
+        BBox/Centroid/Volume 컬럼으로 기하 정보가 통합된 포맷.
+
+        Args:
+            csv_path: UnifiedExport CSV 파일 경로
+
+        Returns:
+            변환 결과 통계
+        """
+        logger.info(f"Converting unified CSV: {csv_path}")
+
+        stats = {
+            "total_rows": 0,
+            "unique_objects": 0,
+            "sp3d_entities": 0,
+            "groups": 0,
+            "path_nodes": 0,
+            "triples_added": 0,
+            "property_values": 0,
+            "max_level": 0,
+            "categories": {},
+            "bbox_count": 0,
+            "format": "unified_v2",
+        }
+
+        objects: Dict[str, Dict] = {}
+        initial_triples = len(self.graph)
+
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                stats["total_rows"] += 1
+
+                obj_id = row.get("ObjectId", "").strip()
+                if not obj_id or obj_id == "00000000-0000-0000-0000-000000000000":
+                    continue
+
+                display_name = row.get("DisplayName", "")
+                parent_id = row.get("ParentId", "").strip()
+                level = int(row.get("Level", "0"))
+                hierarchy_path = row.get("HierarchyPath", "")
+
+                # PropertiesJson 파싱
+                props_json_raw = row.get("PropertiesJson", "")
+                props_list = []
+                sp3d_properties = {}
+                internal_type = ""
+
+                if props_json_raw:
+                    try:
+                        props_list = json.loads(props_json_raw)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid JSON for {obj_id}: {props_json_raw[:100]}")
+
+                for p in props_list:
+                    cat = p.get("category", "")
+                    name = p.get("name", "")
+                    raw_value = p.get("rawValue", "")
+
+                    if cat == "항목" and name == "내부 유형":
+                        internal_type = raw_value
+                    if cat == "SmartPlant 3D":
+                        sp3d_properties[name] = raw_value
+
+                objects[obj_id] = {
+                    "parent_id": parent_id,
+                    "level": level,
+                    "display_name": display_name,
+                    "internal_type": internal_type,
+                    "sp3d_properties": sp3d_properties,
+                    "props_list": props_list,
+                    "hierarchy_path": hierarchy_path,
+                    # Geometry
+                    "bbox_min_x": row.get("BBoxMinX", "").strip(),
+                    "bbox_min_y": row.get("BBoxMinY", "").strip(),
+                    "bbox_min_z": row.get("BBoxMinZ", "").strip(),
+                    "bbox_max_x": row.get("BBoxMaxX", "").strip(),
+                    "bbox_max_y": row.get("BBoxMaxY", "").strip(),
+                    "bbox_max_z": row.get("BBoxMaxZ", "").strip(),
+                    "centroid_x": row.get("CentroidX", "").strip(),
+                    "centroid_y": row.get("CentroidY", "").strip(),
+                    "centroid_z": row.get("CentroidZ", "").strip(),
+                    "volume": row.get("BBoxVolume", "").strip(),
+                    "has_mesh": row.get("HasMesh", "").strip().lower() == "true",
+                    "mesh_uri": row.get("MeshUri", "").strip(),
+                }
+
+        stats["unique_objects"] = len(objects)
+        logger.info(f"Found {len(objects)} unique objects from unified CSV")
+
+        # RDF 트리플 생성
+        for obj_id, obj_data in objects.items():
+            uri = self._get_or_create_element(obj_id, obj_data["display_name"])
+            level = obj_data["level"]
+
+            # 타입 결정
+            internal_type = obj_data["internal_type"]
+            if "SP3D" in internal_type:
+                self.graph.add((uri, RDF.type, NAVIS.SP3DEntity))
+                self.graph.add((uri, RDF.type, BIM.PhysicalElement))
+                stats["sp3d_entities"] += 1
+            elif "Group" in internal_type or "그룹" in internal_type:
+                self.graph.add((uri, RDF.type, NAVIS.NavisGroup))
+                stats["groups"] += 1
+            else:
+                self.graph.add((uri, RDF.type, NAVIS.NavisElement))
+
+            # 기본 속성
+            self.graph.add((uri, NAVIS.hasObjectId, Literal(obj_id)))
+            self.graph.add((uri, BIM.hasName, Literal(obj_data["display_name"])))
+            self.graph.add((uri, RDFS.label, Literal(obj_data["display_name"])))
+            self.graph.add((uri, NAVIS.hasLevel, Literal(level, datatype=XSD.integer)))
+
+            if level > stats["max_level"]:
+                stats["max_level"] = level
+
+            if internal_type:
+                self.graph.add((uri, NAVIS.hasInternalType, Literal(internal_type)))
+
+            # HierarchyPath 저장
+            if obj_data["hierarchy_path"]:
+                self.graph.add((uri, NAVIS.hasHierarchyPath, Literal(obj_data["hierarchy_path"])))
+
+            # 카테고리 분류
+            category_uri = self._classify_element(obj_data["display_name"], internal_type)
+            self.graph.add((uri, BIM.hasCategory, Literal(category_uri.split("#")[-1])))
+            self.graph.add((uri, RDF.type, category_uri))
+
+            cat_name = str(category_uri).split("#")[-1]
+            stats["categories"][cat_name] = stats["categories"].get(cat_name, 0) + 1
+
+            # 부모-자식 관계
+            parent_id = obj_data["parent_id"]
+            if parent_id and parent_id != "00000000-0000-0000-0000-000000000000":
+                parent_uri = self._get_or_create_element(parent_id, "")
+                self.graph.add((uri, NAVIS.hasParent, parent_uri))
+                self.graph.add((parent_uri, NAVIS.hasChild, uri))
+                self.graph.add((uri, NAVIS.hasParentId, Literal(parent_id)))
+
+            # SmartPlant 3D 속성 (기존 방식 - 호환성)
+            for prop_name, prop_value in obj_data["sp3d_properties"].items():
+                if prop_name in self.SP3D_PROPERTY_MAP and prop_value:
+                    prop_uri, datatype = self.SP3D_PROPERTY_MAP[prop_name]
+                    self.graph.add((uri, prop_uri, Literal(prop_value, datatype=datatype)))
+
+            # PropertyValue 패턴 (PropertiesJson의 모든 속성)
+            for idx, p in enumerate(obj_data["props_list"]):
+                raw_value = p.get("rawValue", "")
+                if not raw_value:
+                    continue
+
+                prop_node_id = f"{obj_id}_{idx}".replace("-", "_")
+                prop_node = INST[f"prop_{prop_node_id}"]
+
+                self.graph.add((prop_node, RDF.type, PROP.PropertyValue))
+                self.graph.add((uri, PROP.hasProperty, prop_node))
+                self.graph.add((prop_node, PROP.category, Literal(p.get("category", ""))))
+                self.graph.add((prop_node, PROP.propertyName, Literal(p.get("name", ""))))
+                self.graph.add((prop_node, PROP.rawValue, Literal(raw_value)))
+
+                data_type = p.get("dataType", "")
+                if data_type:
+                    self.graph.add((prop_node, PROP.dataType, Literal(data_type)))
+
+                unit = p.get("unit", "")
+                if unit:
+                    self.graph.add((prop_node, PROP.unit, Literal(unit)))
+
+                # numericValue (UnifiedExport에서 사전 파싱된 숫자값)
+                numeric_val = p.get("numericValue")
+                if numeric_val is not None:
+                    self.graph.add((prop_node, PROP.numericValue,
+                                    Literal(float(numeric_val), datatype=XSD.double)))
+
+                stats["property_values"] += 1
+
+            # Geometry (BoundingBox + Centroid + Volume)
+            if obj_data["bbox_min_x"]:
+                bbox_id = f"{obj_id}".replace("-", "_")
+                bbox_node = INST[f"bbox_{bbox_id}"]
+
+                self.graph.add((bbox_node, RDF.type, BSO.BoundingBox))
+                self.graph.add((uri, BSO.hasBoundingBox, bbox_node))
+
+                for attr, pred in [
+                    ("bbox_min_x", BSO.minX), ("bbox_min_y", BSO.minY), ("bbox_min_z", BSO.minZ),
+                    ("bbox_max_x", BSO.maxX), ("bbox_max_y", BSO.maxY), ("bbox_max_z", BSO.maxZ),
+                    ("centroid_x", BSO.centroidX), ("centroid_y", BSO.centroidY), ("centroid_z", BSO.centroidZ),
+                    ("volume", BSO.volume),
+                ]:
+                    val = self._parse_float_like(obj_data[attr])
+                    if val is not None:
+                        self.graph.add((bbox_node, pred, Literal(val, datatype=XSD.double)))
+
+                if obj_data["has_mesh"]:
+                    self.graph.add((bbox_node, BSO.hasMesh, Literal(True, datatype=XSD.boolean)))
+                    if obj_data["mesh_uri"]:
+                        self.graph.add((bbox_node, BSO.meshUri, Literal(obj_data["mesh_uri"])))
+
+                stats["bbox_count"] += 1
+
+            # System Path 기반 계층 연결
+            system_path = obj_data["sp3d_properties"].get("System Path", "")
+            if system_path:
+                path_node = self._get_or_create_path_node(system_path)
+                if path_node:
+                    self.graph.add((uri, NAVIS.isContainedIn, path_node))
+                    self.graph.add((path_node, NAVIS.containsElement, uri))
+
+                    parts = system_path.split("\\")
+                    for i in range(len(parts)):
+                        ancestor_path = "\\".join(parts[: i + 1])
+                        self._path_element_counts[ancestor_path] = (
+                            self._path_element_counts.get(ancestor_path, 0) + 1
+                        )
+
+        # System Path 노드에 요소 수 추가
+        for path, count in self._path_element_counts.items():
+            if path in self._path_node_cache:
+                node_uri = self._path_node_cache[path]
+                self.graph.add((node_uri, NAVIS.hasElementCount, Literal(count, datatype=XSD.integer)))
+
+        # ParentId 기반 자식/자손 수 계산
+        logger.info("Computing child and descendant counts...")
+        self._compute_hierarchy_counts(objects)
+
+        for obj_id, child_count in self._child_counts.items():
+            if obj_id in self._object_cache:
+                uri = self._object_cache[obj_id]
+                self.graph.add((uri, NAVIS.hasChildCount, Literal(child_count, datatype=XSD.integer)))
+
+        for obj_id, desc_count in self._descendant_counts.items():
+            if obj_id in self._object_cache:
+                uri = self._object_cache[obj_id]
+                self.graph.add((uri, NAVIS.hasDescendantCount, Literal(desc_count, datatype=XSD.integer)))
+
+        # 통계
+        stats["path_nodes"] = len(self._path_node_cache)
+        stats["hierarchy_nodes"] = sum(1 for c in self._child_counts.values() if c > 0)
+        stats["triples_added"] = len(self.graph) - initial_triples
+
+        # 그래프 메타데이터
+        graph_uri = URIRef("http://example.org/bim-ontology/graph#metadata")
+        self.graph.add((graph_uri, RDF.type, OWL.NamedIndividual))
+        self.graph.add((graph_uri, NAVIS.maxHierarchyLevel, Literal(stats["max_level"], datatype=XSD.integer)))
+        self.graph.add((graph_uri, NAVIS.totalObjects, Literal(stats["unique_objects"], datatype=XSD.integer)))
+        self.graph.add((graph_uri, NAVIS.totalPropertyValues, Literal(stats["property_values"], datatype=XSD.integer)))
+        self.graph.add((graph_uri, BSO.totalBoundingBoxes, Literal(stats["bbox_count"], datatype=XSD.integer)))
+
+        logger.info(f"Added {stats['triples_added']} triples, {stats['path_nodes']} path nodes")
+        logger.info(f"Max level: {stats['max_level']}, Properties: {stats['property_values']}, BBoxes: {stats['bbox_count']}")
+
+        return stats
+
     def convert_schedule_csv(self, csv_path: str) -> Dict[str, Any]:
         """Schedule CSV를 RDF로 변환한다.
 
@@ -654,6 +938,20 @@ class NavisToRDFConverter:
         return self.graph
 
 
+def detect_csv_format(csv_path: str) -> str:
+    """CSV 파일의 포맷을 자동 감지한다.
+
+    Returns:
+        "unified" (PropertiesJson 포함) 또는 "legacy" (플랫 컬럼)
+    """
+    with open(csv_path, "r", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        if "PropertiesJson" in header:
+            return "unified"
+        return "legacy"
+
+
 def convert_navis_to_rdf(
     hierarchy_csv: str,
     schedule_csv: Optional[str] = None,
@@ -661,8 +959,12 @@ def convert_navis_to_rdf(
 ) -> Dict[str, Any]:
     """dxtnavis CSV 파일들을 RDF로 변환하는 편의 함수.
 
+    CSV 포맷을 자동 감지하여 적절한 변환 메서드를 호출한다.
+    - UnifiedExport (v2): PropertiesJson + BBox/Centroid/Volume
+    - AllHierarchy (v1): 플랫 컬럼 (속성당 1행)
+
     Args:
-        hierarchy_csv: AllHierarchy CSV 파일 경로
+        hierarchy_csv: AllHierarchy 또는 UnifiedExport CSV 파일 경로
         schedule_csv: Schedule CSV 파일 경로 (선택)
         output_path: 출력 TTL 파일 경로 (선택)
 
@@ -671,9 +973,13 @@ def convert_navis_to_rdf(
     """
     converter = NavisToRDFConverter()
 
-    result = {
-        "hierarchy": converter.convert_hierarchy_csv(hierarchy_csv),
-    }
+    fmt = detect_csv_format(hierarchy_csv)
+    logger.info(f"Detected CSV format: {fmt}")
+
+    if fmt == "unified":
+        result = {"hierarchy": converter.convert_unified_csv(hierarchy_csv)}
+    else:
+        result = {"hierarchy": converter.convert_hierarchy_csv(hierarchy_csv)}
 
     if schedule_csv and Path(schedule_csv).exists():
         result["schedule"] = converter.convert_schedule_csv(schedule_csv)
@@ -702,15 +1008,18 @@ if __name__ == "__main__":
     result = convert_navis_to_rdf(hierarchy_csv, schedule_csv, output_path)
 
     print("\n=== Conversion Results ===")
+    h = result['hierarchy']
+    print(f"Format: {h.get('format', 'legacy_v1')}")
     print(f"Total triples: {result['total_triples']}")
-    print(f"Unique objects: {result['hierarchy']['unique_objects']}")
-    print(f"SP3D entities: {result['hierarchy']['sp3d_entities']}")
-    print(f"Groups: {result['hierarchy']['groups']}")
-    print(f"System Path nodes: {result['hierarchy'].get('path_nodes', 0)}")
-    print(f"Property values: {result['hierarchy'].get('property_values', 0)}")
-    print(f"Max hierarchy level: {result['hierarchy'].get('max_level', 0)}")
+    print(f"Unique objects: {h['unique_objects']}")
+    print(f"SP3D entities: {h['sp3d_entities']}")
+    print(f"Groups: {h['groups']}")
+    print(f"System Path nodes: {h.get('path_nodes', 0)}")
+    print(f"Property values: {h.get('property_values', 0)}")
+    print(f"Bounding Boxes: {h.get('bbox_count', 0)}")
+    print(f"Max hierarchy level: {h.get('max_level', 0)}")
     print(f"\nCategories:")
-    for cat, count in sorted(result['hierarchy']['categories'].items(), key=lambda x: -x[1])[:15]:
+    for cat, count in sorted(h['categories'].items(), key=lambda x: -x[1])[:15]:
         print(f"  {cat}: {count}")
 
     if "schedule" in result:
