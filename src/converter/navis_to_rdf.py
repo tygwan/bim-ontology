@@ -168,6 +168,7 @@ class NavisToRDFConverter:
             (NAVIS.hasSourceFile, "Source File"),
             (NAVIS.hasParent, "Has Parent (ObjectProperty)"),
             (NAVIS.hasChild, "Has Child (ObjectProperty)"),
+            (NAVIS.hasHierarchyPath, "Hierarchy Path (display)"),
         ]
         for prop, label in props:
             self.graph.add((prop, RDF.type, OWL.DatatypeProperty))
@@ -227,6 +228,7 @@ class NavisToRDFConverter:
             (BSO.volume, "BBox Volume", OWL.DatatypeProperty),
             (BSO.hasMesh, "Has Mesh", OWL.DatatypeProperty),
             (BSO.meshUri, "Mesh URI", OWL.DatatypeProperty),
+            (BSO.totalBoundingBoxes, "Total BBox Count (metadata)", OWL.DatatypeProperty),
         ]
         for prop, label, prop_type in bso_props:
             self.graph.add((prop, RDF.type, prop_type))
@@ -612,7 +614,7 @@ class NavisToRDFConverter:
 
                 display_name = row.get("DisplayName", "")
                 parent_id = row.get("ParentId", "").strip()
-                level = int(row.get("Level", "0"))
+                level = self._parse_int_like(row.get("Level", "0")) or 0
                 hierarchy_path = row.get("HierarchyPath", "")
 
                 # PropertiesJson 파싱
@@ -623,11 +625,17 @@ class NavisToRDFConverter:
 
                 if props_json_raw:
                     try:
-                        props_list = json.loads(props_json_raw)
+                        parsed = json.loads(props_json_raw)
+                        if isinstance(parsed, list):
+                            props_list = parsed
+                        else:
+                            logger.warning(f"PropertiesJson not a list for {obj_id}, skipping")
                     except json.JSONDecodeError:
                         logger.warning(f"Invalid JSON for {obj_id}: {props_json_raw[:100]}")
 
                 for p in props_list:
+                    if not isinstance(p, dict):
+                        continue
                     cat = p.get("category", "")
                     name = p.get("name", "")
                     raw_value = p.get("rawValue", "")
@@ -743,9 +751,11 @@ class NavisToRDFConverter:
 
                 # numericValue (UnifiedExport에서 사전 파싱된 숫자값)
                 numeric_val = p.get("numericValue")
-                if numeric_val is not None:
-                    self.graph.add((prop_node, PROP.numericValue,
-                                    Literal(float(numeric_val), datatype=XSD.double)))
+                if numeric_val is not None and numeric_val != "":
+                    parsed_num = self._parse_float_like(str(numeric_val))
+                    if parsed_num is not None:
+                        self.graph.add((prop_node, PROP.numericValue,
+                                        Literal(parsed_num, datatype=XSD.double)))
 
                 stats["property_values"] += 1
 
