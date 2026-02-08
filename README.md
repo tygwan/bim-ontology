@@ -19,7 +19,22 @@ IFC File ────────────────►│             │ 
 ### Two Data Pipelines
 
 | Pipeline | Source | Output | Features |
-|----------|--------|--------|----------|
+|------
+
+## Projects Using cc-initializer
+
+### Community Showcase
+
+| Project | Description |
+|---------|-------------|
+| [tygwan/bim-ontology](https://github.com/tygwan/bim-ontology) | BIM Ontology - Semantic BIM Pipeline |
+| [tygwan/dxtnavis](https://github.com/tygwan/dxtnavis) | DXT Navigator - Real-world example project |
+
+> **Add your project**: Add `uses-cc-initializer` topic to your repo or [submit a PR](PROJECTS.json)
+
+_Last updated: 2026-02-08_
+
+-------|--------|--------|----------|
 | **CSV Pipeline** (recommended) | Navisworks AllHierarchy CSV (76MB) | navis-via-csv.ttl (282K triples) | ParentId hierarchy, SP3D properties, PropertyValue reification |
 | **IFC Pipeline** | IFC4/IFC2X3 file | nwd4op-12.ttl (39K triples) | Building hierarchy, ifcOWL triples |
 
